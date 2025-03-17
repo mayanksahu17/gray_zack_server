@@ -1,4 +1,4 @@
-import {Book} from '../models/book.model'
+import {Book} from '../models/booking.model'
 import {Request , Response} from "express";
 import {asyncHandler} from "../utills/asyncHandler";
 import {uploadOnCloudinary} from "../utills/cloudinary";
