@@ -5,15 +5,14 @@ import bcrypt from "bcrypt";
 interface IUser extends Document {
     username: string;
     email: string;
-    fullName: string;
-    books : [Schema.Types.ObjectId[]];
-    sellBooks : [Schema.Types.ObjectId[]];
     password: string;
     refreshToken?: string;
     role : string;
-    address : string;
-
-
+    isAdmin: Boolean,
+    isActive: Boolean,
+    createdAt: Date,
+    updatedAt: Date,
+    // createdBy: ObjectId ,
     isPasswordCorrect(password: string): Promise<boolean>;
     generateAccessToken(): string;
     generateRefreshToken(): string;
@@ -47,19 +46,7 @@ const userSchema: Schema<IUser> = new Schema<IUser>({
     role : {
         type : String
     },
-    books : [{
-        type: Schema.Types.ObjectId,
-        ref: "Book"
-    } ],
-    sellBooks : [
-        {
-            type : Schema.Types.ObjectId,
-            ref : "Book"
-        }
-    ],
-    address: {
-        type: String
-    },
+    
 
 }, { timestamps: true });
 

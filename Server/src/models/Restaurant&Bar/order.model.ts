@@ -4,7 +4,7 @@ export interface IOrder extends Document {
     orderId: string;
     tableId: string;
     totalAmount: number;
-    items: string[];
+    items: [Schema.Types.ObjectId[]];
     status: string;
     paymentStatus: string;
     timestamp: Date;
@@ -15,7 +15,10 @@ export interface IOrder extends Document {
     orderId: { type: String, required: true, unique: true },
     tableId: { type: String, ref: "Table", required: true },
     totalAmount: { type: Number, required: true },
-    items: [{ type: String, ref: "Menu" }],
+    items: [{
+      type: Schema.Types.ObjectId,
+      ref: "Menu"
+  } ],
     status: { type: String, required: true },
     paymentStatus: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
@@ -24,3 +27,5 @@ export interface IOrder extends Document {
   
   export default mongoose.model<IOrder>("Order", OrderSchema);
   
+
+

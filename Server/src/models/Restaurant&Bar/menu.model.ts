@@ -12,7 +12,7 @@ export interface IMenu extends Document {
 }
 
 const MenuSchema = new Schema<IMenu>({
-  itemId: { type: String, required: true, unique: true },
+  itemId: [{ type: String, required: true, unique: true }],
   name: { type: String, required: true },
   section: {
     type: String,
