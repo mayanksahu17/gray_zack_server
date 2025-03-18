@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 import bcrypt from 'bcrypt';
+import jwt, { SignOptions } from "jsonwebtoken";
 
 // Define enum types for better type safety
 enum AdminRole {
@@ -34,11 +35,15 @@ export interface IAdministrator extends Document {
   status: AdminStatus;
   createdAt: Date;
   updatedAt: Date;
+  refreshToken: string;
+  accessToken : string;
   
   // Instance methods
   comparePassword(candidatePassword: string): Promise<boolean>;
   isActive(): boolean;
   hasPermission(permission: AdminPermission): boolean;
+  generateAccessToken(): string;
+  generateRefreshToken(): string;
 }
 
 // Interface for the Administrator model
@@ -122,7 +127,15 @@ const AdministratorSchema = new Schema<IAdministrator>(
     updatedAt: {
       type: Date,
       default: Date.now
+    },
+    refreshToken: {
+      type: String
+    },
+    accessToken: {
+      type: String
     }
+
+
   },
   {
     timestamps: true, // Automatically manages createdAt and updatedAt
@@ -175,7 +188,24 @@ AdministratorSchema.methods.hasPermission = function(permission: AdminPermission
 
 // Static method to find admin by email
 AdministratorSchema.statics.findByEmail = function(email: string) {
-  return this.findOne({ email: email.toLowerCase() });
+  return this.findOne({ email: email.toLowerCase() }).select('+password');
+};
+
+// Change from statics to methods
+AdministratorSchema.methods.generateAccessToken = function() {
+  return jwt.sign(
+    { id: this._id },
+    process.env.ACCESS_TOKEN_SECRET || 'fallback-secret',
+    { expiresIn: '1d' }
+  );
+};
+
+AdministratorSchema.methods.generateRefreshToken = function() {
+  return jwt.sign(
+    { id: this._id },
+    process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret',
+    { expiresIn: '7d' }
+  );
 };
 
 // Create and export the model

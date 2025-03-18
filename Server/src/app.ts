@@ -15,17 +15,50 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
-import roomRouter from './routes/room.routes'
-import hotelRouter from './routes/admin.hotel.route'
 
-app.use('/api/v1/room',roomRouter)
-app.use('/api/v1/admin/hotel',hotelRouter)
 
-app.use('hii',async ( res : Response) => {
-    res.status(200).json({
-        message : "hii"
-    })
-})
+import adminRouter from './routes/adminRoutes/admin.route'
+
+
+app.use('/api/v1.0/admin',adminRouter)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// import roomRouter from './routes/room.routes'
+// import hotelRouter from './routes/admin.hotel.route'
+
+// app.use('/api/v1/room',roomRouter)
+// app.use('/api/v1/admin/hotel',hotelRouter)
+// app.use()
+// app.use('hii',async ( res : Response) => {
+//     res.status(200).json({
+//         message : "hii"
+//     })
+// })
 
 
 export { app };
