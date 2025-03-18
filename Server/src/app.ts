@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -15,9 +15,17 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
-import router from './routes/user.route'
+import roomRouter from './routes/room.routes'
+import hotelRouter from './routes/admin.hotel.route'
 
+app.use('/api/v1/room',roomRouter)
+app.use('/api/v1/admin/hotel',hotelRouter)
 
+app.use('hii',async ( res : Response) => {
+    res.status(200).json({
+        message : "hii"
+    })
+})
 
 
 export { app };

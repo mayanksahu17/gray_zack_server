@@ -45,6 +45,7 @@ export interface IHotel extends Document {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  employee: mongoose.Types.ObjectId[];
 }
 
 const HotelSchema: Schema = new Schema({
@@ -61,7 +62,7 @@ const HotelSchema: Schema = new Schema({
     type: { type: String, enum: ['Point'], default: 'Point' },
     coordinates: { type: [Number], required: true } // [longitude, latitude]
   },
-  category: { type: String, required: true, enum: ['Luxury', 'Business', 'Resort', 'Budget', 'Boutique'] },
+  category: { type: String, required: true, enum: ['Luxury', 'Business', 'Resort', 'Budget'] },
   starRating: { type: Number, required: true, min: 1, max: 5 },
   images: [{ type: String }],
   amenities: [{ type: String }],
@@ -98,4 +99,4 @@ HotelSchema.index({ location: '2dsphere' });
 // Create index for searching by name
 HotelSchema.index({ name: 'text', description: 'text' });
 
-export default mongoose.model<IHotel>('Hotel', HotelSchema); 
+export default mongoose.model<IHotel>('Hotel', HotelSchema,"hotels"); 

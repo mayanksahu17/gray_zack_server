@@ -21,7 +21,8 @@
     "mongoose": "^8.2.1",
     "multer": "^1.4.5-lts.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

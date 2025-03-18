@@ -1,4 +1,18 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+
+
+interface BulkRoomCreationParams {
+  hotelId: string;
+  category: string;
+  count: number;
+  pricePerNight: number;
+  capacity: number;
+  amenities?: string[];
+  tags?: string[];
+  images?: string[];
+}
+
 
 interface IRoom extends Document {
   id: string;
@@ -14,6 +28,11 @@ interface IRoom extends Document {
   bookings: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Add this interface for static methods
+interface IRoomModel extends mongoose.Model<IRoom> {
+  createBulkRooms(params: BulkRoomCreationParams): Promise<IRoom[]>;
 }
 
 const RoomSchema: Schema<IRoom> = new Schema<IRoom>({
@@ -75,4 +94,52 @@ RoomSchema.methods.canBeBooked = function() {
   return ['available', 'reserved'].includes(this.status);
 };
 
-export const Room = mongoose.model<IRoom>("Room", RoomSchema);
+// Add this static method to your RoomSchema
+RoomSchema.statics.createBulkRooms = async function(params: BulkRoomCreationParams) {
+  const {
+    hotelId,
+    category,
+    count,
+    pricePerNight,
+    capacity,
+    amenities = [],
+    tags = [],
+    images = []
+  } = params;
+  
+  // Validate category is valid
+  if (!['standard', 'deluxe', 'suite', 'presidential'].includes(category)) {
+    throw new Error(`Invalid room category: ${category}`);
+  }
+  
+  // Create room documents
+  const roomsToCreate = [];
+  
+  for (let i = 0; i < count; i++) {
+    // Generate a sequential room number based on category and index
+    const roomNumber = `${category.charAt(0).toUpperCase()}${String(i + 1).padStart(3, '0')}`;
+    
+    roomsToCreate.push({
+      id: uuidv4(), // Generate unique ID for each room
+      roomId: `${hotelId}-${roomNumber}`,
+      status: 'available',
+      category,
+      tags,
+      pricePerNight,
+      capacity,
+      amenities,
+      images,
+      bookings: []
+    });
+  }
+  
+  // Use insertMany for efficient bulk creation
+  const createdRooms = await this.insertMany(roomsToCreate);
+  return createdRooms;
+};
+
+// Don't forget to update your model definition to include the static methods
+
+
+export const Room = mongoose.model<IRoom, IRoomModel>("Room", RoomSchema,"rooms");
+
