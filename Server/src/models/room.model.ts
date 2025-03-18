@@ -7,9 +7,10 @@ interface IRoom extends Document {
   status: string;
   category: string;
   tags: string[];
-  price: number;
+  pricePerNight: number;
   capacity: number;
   amenities: string[];
+  images: string[];
   bookings: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
@@ -32,7 +33,7 @@ const RoomSchema: Schema<IRoom> = new Schema<IRoom>({
   status: {
     type: String,
     required: true,
-    enum: ['available', 'occupied', 'maintenance', 'reserved']
+    enum: ['available', 'occupied', 'in maintenance', 'reserved']
   },
   category: {
     type: String,
@@ -42,7 +43,7 @@ const RoomSchema: Schema<IRoom> = new Schema<IRoom>({
   tags: [{
     type: String,
   }],
-  price: {
+  pricePerNight: {
     type: Number,
     required: true,
     min: 0
