@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utills/ApiError';
 import { AdminRole, AdminPermission } from '../NewModels/administrator.model';
+import { IStaffDocument } from '../NewModels/staff.model';
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -54,3 +55,23 @@ export const authorizePermission = (
 // Optional: Helper function for common authorization patterns
 export const authorizeSystemAdmin = authorizePermission([AdminRole.SYSTEM_ADMIN]);
 export const authorizeSupportStaff = authorizePermission([AdminRole.SUPPORT_STAFF]);
+
+export const authorizeStaff = (allowedRoles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const user = req.user as IStaffDocument;
+            
+            if (!user) {
+                throw new ApiError(401, "Unauthorized access");
+            }
+
+            if (!allowedRoles.includes(user.role)) {
+                throw new ApiError(403, "You don't have permission to perform this action");
+            }
+
+            next();
+        } catch (error) {
+            next(error);
+        }
+    };
+};

@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 import bcrypt from 'bcrypt';
+import jwt, { SignOptions } from "jsonwebtoken";
 
 // Define enum for staff roles
 enum StaffRole {
@@ -27,9 +28,14 @@ export interface IStaffDocument extends Document {
   permissions: string[];
   password: string;
   status: StaffStatus;
+  refreshToken: string;
+  accessToken : string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
+  generateAccessToken(): string;
+  generateRefreshToken(): string;
+  isActive(): boolean;
 }
 
 // Staff schema
@@ -90,6 +96,12 @@ const staffSchema = new Schema<IStaffDocument>(
       required: [true, 'Status is required'],
       enum: Object.values(StaffStatus),
       default: StaffStatus.ACTIVE
+    },
+    refreshToken: {
+      type: String
+    },
+    accessToken: {
+      type: String
     }
   },
   {
@@ -124,6 +136,22 @@ staffSchema.methods.comparePassword = async function(candidatePassword: string):
   } catch (error) {
     return false;
   }
+};
+// Change from statics to methods
+staffSchema.methods.generateAccessToken = function() {
+  return jwt.sign(
+    { id: this._id },
+    process.env.ACCESS_TOKEN_SECRET || 'fallback-secret',
+    { expiresIn: '1d' }
+  );
+};
+
+staffSchema.methods.generateRefreshToken = function() {
+  return jwt.sign(
+    { id: this._id },
+    process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret',
+    { expiresIn: '7d' }
+  );
 };
 
 // Virtual for staff member's access level (numeric representation of role privileges)
