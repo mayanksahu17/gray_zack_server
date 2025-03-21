@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utills/ApiError";
 import { asyncHandler } from "../utills/asyncHandler";
 import jwt from "jsonwebtoken";
-import { Administrator } from "../NewModels/administrator.model";
+import { Administrator } from "../models/administrator.model";
 
 // Extend Request type
 declare global {

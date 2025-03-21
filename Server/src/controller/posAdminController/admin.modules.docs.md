@@ -1,163 +1,215 @@
-# Hotel POS System API Documentation
+# Administrator API Testing Guide
 
-## Overview
-The **Hotel POS System** enables administrators to create and manage hotels for subscribed hotel owners. The system allows hotel owners to manage their hotel's employees, rooms, and services. Guests can check in, use hotel services, and pay their total bill upon checkout.
+## Base URL: http://localhost:8000/api/v1.0/admin
 
-This documentation provides details on the **Admin Modules**, including authentication, user management, and hotel creation.
-
----
-## Authentication
-
-### Admin Login
-**Endpoint:** `POST /api/v1.0/admin/login`
-
-**Request:**
+### 1. Create First Administrator (System Admin) - No Authentication Required
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/login \  
--H "Content-Type: application/json" \  
+curl -X POST http://localhost:8000/api/v1.0/admin/initialize \
+-H "Content-Type: application/json" \
 -d '{
-  "email": "john.smith@example.com",
+  "name": "System Admin",
+  "email": "sysadmin@example.com",
+  "phone": "+1-555-987-6543",
+  "role": "system_admin",
+  "permissions": [
+    "create_hotel",
+    "manage_subscriptions",
+    "view_all_data",
+    "manage_users",
+    "system_settings",
+    "audit_logs",
+    "support_tickets"
+  ],
   "password": "SecurePass123!"
-}' -c cookies.txt
-```
-
-**Response:**
-```json
-{
-  "token": "your_access_token",
-  "expires_in": 3600
-}
-```
-
-### Refresh Token
-**Endpoint:** `POST /api/v1.0/admin/refresh-token`
-
-**Request:**
-```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/refresh-token \  
--H "Content-Type: application/json" \  
--b cookies.txt
-```
-
-**Response:**
-```json
-{
-  "token": "new_access_token",
-  "expires_in": 3600
-}
-```
-
----
-## Admin Management
-
-### Create Admin
-**Endpoint:** `POST /api/v1.0/admin/create`
-
-**Request:**
-```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/create \  
--H "Content-Type: application/json" \  
--b cookies.txt \  
--d '{
-  "name": "Support Staff",
-  "email": "support@example.com",
-  "phone": "+1-555-987-6544",
-  "role": "support_staff",
-  "permissions": ["support_tickets", "view_all_data"],
-  "password": "StaffPass123!"
 }'
-```
 
-**Response:**
-```json
+# Expected Success Response (201):
 {
-  "id": "67d9de4c740f3d1963010330",
-  "name": "Support Staff",
-  "email": "support@example.com",
-  "phone": "+1-555-987-6544",
-  "role": "support_staff",
-  "status": "active"
+  "success": true,
+  "data": {
+    "_id": "65f123456789abcdef123456",
+    "name": "System Admin",
+    "email": "sysadmin@example.com",
+    "phone": "+1-555-987-6543",
+    "role": "system_admin",
+    "permissions": [
+      "create_hotel",
+      "manage_subscriptions",
+      "view_all_data",
+      "manage_users",
+      "system_settings",
+      "audit_logs",
+      "support_tickets"
+    ],
+    "status": "active",
+    "createdAt": "2024-03-13T10:00:00.000Z",
+    "updatedAt": "2024-03-13T10:00:00.000Z"
+  }
 }
 ```
 
-### Get Admin List
-**Endpoint:** `POST /api/v1.0/admin?page=1&limit=10`
-
-**Request:**
+### 2. Login as System Admin
 ```bash
-curl -X POST "http://localhost:8000/api/v1.0/admin?page=1&limit=10" \  
--H "Content-Type: application/json" \  
--b cookies.txt
+curl -X POST http://localhost:8000/api/v1.0/admin/login \
+-H "Content-Type: application/json" \
+-c cookies.txt \
+-d '{
+  "email": "sysadmin@example.com",
+  "password": "SecurePass123!"
+}'
+
+# Expected Success Response (200):
+{
+  "success": true,
+  "data": {
+    "_id": "65f123456789abcdef123456",
+    "email": "sysadmin@example.com",
+    "name": "System Admin",
+    "role": "system_admin",
+    "accessToken": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
 ```
 
-**Response:**
-```json
+### 3. Create Hotel Admin (Requires System Admin Authentication)
+```bash
+curl -X POST http://localhost:8000/api/v1.0/admin/create \
+-H "Content-Type: application/json" \
+-b cookies.txt \
+-d '{
+  "name": "Hotel Admin",
+  "email": "hoteladmin@example.com",
+  "phone": "+1-555-987-6544",
+  "role": "hotel_admin",
+  "permissions": [
+    "create_hotel",
+    "manage_users",
+    "support_tickets"
+  ],
+  "password": "HotelAdmin123!"
+}'
+
+# Expected Success Response (201):
 {
-  "admins": [
+  "success": true,
+  "data": {
+    "_id": "65f123456789abcdef123457",
+    "name": "Hotel Admin",
+    "email": "hoteladmin@example.com",
+    "phone": "+1-555-987-6544",
+    "role": "hotel_admin",
+    "permissions": [
+      "create_hotel",
+      "manage_users",
+      "support_tickets"
+    ],
+    "status": "active",
+    "createdAt": "2024-03-13T10:30:00.000Z",
+    "updatedAt": "2024-03-13T10:30:00.000Z"
+  }
+}
+```
+
+### 4. Verify Created Hotel Admin (List Administrators)
+```bash
+curl -X POST "http://localhost:8000/api/v1.0/admin?page=1&limit=10" \
+-H "Content-Type: application/json" \
+-b cookies.txt
+
+# Expected Success Response (200):
+{
+  "success": true,
+  "data": [
     {
-      "id": "67d9de4c740f3d1963010330",
-      "name": "John Doe",
-      "email": "john.doe@example.com",
-      "role": "admin"
+      "_id": "65f123456789abcdef123457",
+      "name": "Hotel Admin",
+      "email": "hoteladmin@example.com",
+      "role": "hotel_admin",
+      "status": "active"
     },
     {
-      "id": "67d9de4c740f3d1963010331",
-      "name": "Jane Smith",
-      "email": "jane.smith@example.com",
-      "role": "hotel_owner"
+      "_id": "65f123456789abcdef123456",
+      "name": "System Admin",
+      "email": "sysadmin@example.com",
+      "role": "system_admin",
+      "status": "active"
     }
   ],
-  "total": 2
+  "pagination": {
+    "total": 2,
+    "page": 1,
+    "pages": 1
+  }
 }
 ```
 
-### Update Admin
-**Endpoint:** `PUT /api/v1.0/admin/{admin_id}`
-
-**Request:**
+### 5. Logout
 ```bash
-curl -X PUT http://localhost:8000/api/v1.0/admin/67d9de4c740f3d1963010330 \  
--H "Content-Type: application/json" \  
--b cookies.txt \  
--d '{
-  "name": "Updated Name",
-  "phone": "+1-555-987-6545",
-  "status": "active"
-}'
-```
-
-**Response:**
-```json
-{
-  "id": "67d9de4c740f3d1963010330",
-  "name": "Updated Name",
-  "phone": "+1-555-987-6545",
-  "status": "active"
-}
-```
-
-### Delete Admin
-**Endpoint:** `DELETE /api/v1.0/admin/{admin_id}`
-
-**Request:**
-```bash
-curl -X DELETE http://localhost:8000/api/v1.0/admin/67d9fa6aa10df8d12913262d \  
--H "Content-Type: application/json" \  
+curl -X POST http://localhost:8000/api/v1.0/admin/logout \
 -b cookies.txt
-```
 
-**Response:**
-```json
+# Expected Success Response (200):
 {
-  "message": "Admin deleted successfully"
+  "success": true,
+  "message": "Logged out successfully"
 }
 ```
 
----
-## Next Steps
-This document covers the **Admin Modules** of the **Hotel POS System**. Upcoming sections will include:
-- **Hotel Management API** (Creating and managing hotels)
-- **Hotel Owner API** (Managing hotel staff, rooms, and services)
-- **Guest Management API** (Check-ins, checkouts, and billing)
+## Error Cases to Test:
 
-Stay tuned for further updates!
+1. Creating Admin with Existing Email:
+```bash
+curl -X POST http://localhost:8000/api/v1.0/admin/create \
+-H "Content-Type: application/json" \
+-b cookies.txt \
+-d '{
+  "name": "Duplicate Admin",
+  "email": "hoteladmin@example.com",
+  "phone": "+1-555-987-6545",
+  "role": "hotel_admin",
+  "password": "Password123!"
+}'
+
+# Expected Error Response (409):
+{
+  "success": false,
+  "message": "Administrator with this email already exists"
+}
+```
+
+2. Invalid Password Format:
+```bash
+curl -X POST http://localhost:8000/api/v1.0/admin/create \
+-H "Content-Type: application/json" \
+-b cookies.txt \
+-d '{
+  "name": "Hotel Admin",
+  "email": "newadmin@example.com",
+  "phone": "+1-555-987-6546",
+  "role": "hotel_admin",
+  "password": "weak"
+}'
+
+# Expected Error Response (400):
+{
+  "success": false,
+  "message": "Password must contain at least 8 characters, including uppercase, lowercase, number and special character"
+}
+```
+
+## Testing Notes:
+1. Replace `http://localhost:8000` with your actual API base URL
+2. The `-c cookies.txt` flag saves cookies from the response
+3. The `-b cookies.txt` flag sends cookies with the request
+4. Ensure proper phone number format: `+{country-code}-{xxx}-{xxx}-{xxxx}`
+5. Valid roles are: `system_admin`, `hotel_admin`, `staff_admin`
+6. Valid permissions are:
+   - create_hotel
+   - manage_subscriptions
+   - view_all_data
+   - manage_users
+   - system_settings
+   - audit_logs
+   - support_tickets
+
+Would you like me to provide any additional test cases or explain any part in more detail?

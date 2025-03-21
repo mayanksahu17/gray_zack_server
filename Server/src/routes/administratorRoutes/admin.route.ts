@@ -10,7 +10,7 @@ import {
 } from '../../controller/posAdminController/administrator.controller';
 import { verifyJWT } from '../../middleware/auth.middleware';
 import { authorizePermission } from '../../middleware/authorize.middleware';
-import { AdminPermission, AdminRole } from '../../NewModels/administrator.model';
+import { AdminPermission, AdminRole } from '../../models/administrator.model';
 
 const router = Router();
 

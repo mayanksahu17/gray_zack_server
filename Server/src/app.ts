@@ -17,10 +17,12 @@ app.use(cookieParser());
 
 
 
-import adminRouter from './routes/adminRoutes/admin.route'
+import adminRouter from './routes/administratorRoutes/admin.route'
+import hotelAdminRouter from './routes/admin.hotel.route'
 
 
 app.use('/api/v1.0/admin',adminRouter)
+app.use('/api/v1/admin/hotels', hotelAdminRouter)
 
 
 
@@ -49,9 +51,6 @@ app.use('/api/v1.0/admin',adminRouter)
 
 
 // import roomRouter from './routes/room.routes'
-// import hotelRouter from './routes/admin.hotel.route'
-
-// app.use('/api/v1/room',roomRouter)
 // app.use('/api/v1/admin/hotel',hotelRouter)
 // app.use()
 // app.use('hii',async ( res : Response) => {

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utills/ApiError';
-import { AdminRole, AdminPermission } from '../NewModels/administrator.model';
-import { IStaffDocument } from '../NewModels/staff.model';
+import { AdminRole, AdminPermission } from '../models/administrator.model';
+import { IStaffDocument } from '../models/staff.model';
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -54,7 +54,7 @@ export const authorizePermission = (
 
 // Optional: Helper function for common authorization patterns
 export const authorizeSystemAdmin = authorizePermission([AdminRole.SYSTEM_ADMIN]);
-export const authorizeSupportStaff = authorizePermission([AdminRole.SUPPORT_STAFF]);
+export const authorizeSupportStaff = authorizePermission([AdminRole.HOTEL_ADMIN]);
 
 export const authorizeStaff = (allowedRoles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {

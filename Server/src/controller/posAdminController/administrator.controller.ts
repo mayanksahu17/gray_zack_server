@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Administrator, AdminRole, AdminStatus, AdminPermission } from '../../NewModels/administrator.model';
+import { Administrator, AdminRole, AdminStatus, AdminPermission } from '../../models/administrator.model';
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../../utills/ApiError';
 import { asyncHandler } from '../../utills/asyncHandler';

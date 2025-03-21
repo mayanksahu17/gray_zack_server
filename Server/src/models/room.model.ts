@@ -1,145 +1,133 @@
-import mongoose, { Schema, Document } from "mongoose";
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
-
-interface BulkRoomCreationParams {
-  hotelId: string;
-  category: string;
-  count: number;
-  pricePerNight: number;
-  capacity: number;
-  amenities?: string[];
-  tags?: string[];
-  images?: string[];
+// Define enum for room types
+enum RoomType {
+  STANDARD = 'standard',
+  DELUXE = 'deluxe',
+  SUITE = 'suite',
+  PRESIDENTIAL = 'presidential'
 }
 
+// Define enum for room status
+enum RoomStatus {
+  AVAILABLE = 'available',
+  OCCUPIED = 'occupied',
+  MAINTENANCE = 'maintenance',
+  CLEANING = 'cleaning'
+}
 
-interface IRoom extends Document {
-  id: string;
-  guestId: string;
-  roomId: string;
-  status: string;
-  category: string;
-  tags: string[];
-  pricePerNight: number;
+// Room interface
+export interface IRoomDocument extends Document {
+  hotelId: Types.ObjectId;
+  roomNumber: string;
+  type: RoomType;
+  floor: number;
   capacity: number;
   amenities: string[];
-  images: string[];
-  bookings: mongoose.Types.ObjectId[];
+  pricePerNight: number;
+  status: RoomStatus;
+  lastCleaned: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Add this interface for static methods
-interface IRoomModel extends mongoose.Model<IRoom> {
-  createBulkRooms(params: BulkRoomCreationParams): Promise<IRoom[]>;
-}
+// Room schema
+const roomSchema = new Schema<IRoomDocument>(
+  {
+    hotelId: {
+      type: Schema.Types.ObjectId,
+      required: [true, 'Hotel ID is required'],
+      ref: 'Hotel' // Reference to Hotel model, but not creating a new model
+    },
+    roomNumber: {
+      type: String,
+      required: [true, 'Room number is required'],
+      trim: true,
+      index: true
+    },
+    type: {
+      type: String,
+      required: [true, 'Room type is required'],
+      enum: Object.values(RoomType),
+      default: RoomType.STANDARD
+    },
+    floor: {
+      type: Number,
+      required: [true, 'Floor number is required'],
+      min: [0, 'Floor number cannot be negative'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'Floor number must be an integer'
+      }
+    },
+    capacity: {
+      type: Number,
+      required: [true, 'Room capacity is required'],
+      min: [1, 'Capacity must be at least 1'],
+      max: [10, 'Capacity cannot exceed 10'],
+      validate: {
+        validator: Number.isInteger,
+        message: 'Capacity must be an integer'
+      }
+    },
+    amenities: [{
+      type: String,
+      trim: true
+    }],
+    pricePerNight: {
+      type: Number,
+      required: [true, 'Price per night is required'],
+      min: [0, 'Price cannot be negative'],
+      get: (v: number) => parseFloat(v.toFixed(2)),
+      set: (v: number) => parseFloat(v.toFixed(2))
+    },
+    status: {
+      type: String,
+      required: [true, 'Room status is required'],
+      enum: Object.values(RoomStatus),
+      default: RoomStatus.AVAILABLE
+    },
+    lastCleaned: {
+      type: Date,
+      default: null
+    }
+  },
+  {
+    timestamps: true, // Automatically adds createdAt and updatedAt
+    versionKey: false // Don't add __v field
+  }
+);
 
-const RoomSchema: Schema<IRoom> = new Schema<IRoom>({
-  id: {
-    type: String,
-    required: true,
-    unique: true,
-    primaryKey: true
-  },
-  guestId: {
-    type: String,
-  },
-  roomId: {
-    type: String,
-    required: true
-  },
-  status: {
-    type: String,
-    required: true,
-    enum: ['available', 'occupied', 'in maintenance', 'reserved']
-  },
-  category: {
-    type: String,
-    required: true,
-    enum: ['standard', 'deluxe', 'suite', 'presidential']
-  },
-  tags: [{
-    type: String,
-  }],
-  pricePerNight: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  capacity: {
-    type: Number,
-    required: true,
-    default: 1,
-    min: 1
-  },
-  amenities: [{
-    type: String
-  }],
-  bookings: [{
-    type: Schema.Types.ObjectId,
-    ref: 'Booking'
-  }],
-}, { timestamps: true });
+// Add compound index for efficient querying
+roomSchema.index({ hotelId: 1, roomNumber: 1 }, { unique: true });
+roomSchema.index({ hotelId: 1, status: 1 });
+roomSchema.index({ hotelId: 1, type: 1 });
+roomSchema.index({ hotelId: 1, floor: 1 });
 
-RoomSchema.index({ status: 1 });
-RoomSchema.index({ category: 1 });
-RoomSchema.index({ price: 1 });
-
-RoomSchema.virtual('isAvailable').get(function() {
-  return this.status === 'available';
+// Virtual for room identifier (e.g., "Floor 3 - Room 301")
+roomSchema.virtual('roomIdentifier').get(function(this: IRoomDocument) {
+  return `Floor ${this.floor} - Room ${this.roomNumber}`;
 });
 
-RoomSchema.methods.canBeBooked = function() {
-  return ['available', 'reserved'].includes(this.status);
+// Method to check if room needs cleaning (e.g., hasn't been cleaned in 24 hours)
+roomSchema.methods.needsCleaning = function(this: IRoomDocument): boolean {
+  if (!this.lastCleaned) return true;
+  
+  const CLEANING_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  const timeSinceCleaning = Date.now() - this.lastCleaned.getTime();
+  return timeSinceCleaning > CLEANING_INTERVAL;
 };
 
-// Add this static method to your RoomSchema
-RoomSchema.statics.createBulkRooms = async function(params: BulkRoomCreationParams) {
-  const {
-    hotelId,
-    category,
-    count,
-    pricePerNight,
-    capacity,
-    amenities = [],
-    tags = [],
-    images = []
-  } = params;
+// Pre-save middleware for validation or data manipulation
+roomSchema.pre('save', function(next) {
+  // Ensure room number follows hotel's format convention if needed
+  // For example, ensuring it's a string even if numbers are provided
+  this.roomNumber = String(this.roomNumber).trim();
   
-  // Validate category is valid
-  if (!['standard', 'deluxe', 'suite', 'presidential'].includes(category)) {
-    throw new Error(`Invalid room category: ${category}`);
-  }
-  
-  // Create room documents
-  const roomsToCreate = [];
-  
-  for (let i = 0; i < count; i++) {
-    // Generate a sequential room number based on category and index
-    const roomNumber = `${category.charAt(0).toUpperCase()}${String(i + 1).padStart(3, '0')}`;
-    
-    roomsToCreate.push({
-      id: uuidv4(), // Generate unique ID for each room
-      roomId: `${hotelId}-${roomNumber}`,
-      status: 'available',
-      category,
-      tags,
-      pricePerNight,
-      capacity,
-      amenities,
-      images,
-      bookings: []
-    });
-  }
-  
-  // Use insertMany for efficient bulk creation
-  const createdRooms = await this.insertMany(roomsToCreate);
-  return createdRooms;
-};
+  // Additional validation or business logic can be added here
+  next();
+});
 
-// Don't forget to update your model definition to include the static methods
-
-
-export const Room = mongoose.model<IRoom, IRoomModel>("Room", RoomSchema,"rooms");
-
+// Create and export the model
+const Room = mongoose.model<IRoomDocument>('Room', roomSchema);
+export default Room;

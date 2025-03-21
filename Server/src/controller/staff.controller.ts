@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import Staff, { IStaffDocument } from '../NewModels/staff.model';
+import Staff, { IStaffDocument } from '../models/staff.model';
 import { ApiError } from '../utills/ApiError';
 import { asyncHandler } from '../utills/asyncHandler';
 import jwt from 'jsonwebtoken';
