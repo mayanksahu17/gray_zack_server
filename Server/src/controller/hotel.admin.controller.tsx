@@ -165,8 +165,8 @@ export const createStaffRole = asyncHandler(async (req: Request, res: Response) 
   }
 
   // Hash the password
-  const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
+  // const saltRounds = 10;
+  // const hashedPassword = await bcrypt.hash(password, saltRounds);
 
   // Generate tokens
   const accessToken = jwt.sign(
@@ -189,7 +189,7 @@ export const createStaffRole = asyncHandler(async (req: Request, res: Response) 
     phone,
     role,
     permissions,
-    password: hashedPassword,
+    password,
     status: status || 'active',
     refreshToken,
     accessToken,

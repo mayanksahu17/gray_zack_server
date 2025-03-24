@@ -19,10 +19,11 @@ app.use(cookieParser());
 
 import adminRouter from './routes/administratorRoutes/admin.route'
 import hotelAdminRouter from './routes/admin.hotel.route'
-
+import staffRouter from './routes/staff.route'
 
 app.use('/api/v1.0/admin',adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
+app.use('/api/v1/staff/hotel', staffRouter)
 
 
 

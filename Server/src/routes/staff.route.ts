@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import {
-  createStaff,
   loginStaff,
   getStaffByHotel,
   updateStaff,
@@ -20,7 +19,6 @@ router.post("/refresh-token", refreshToken);
 // Protected routes
 router.use(verifyJWT); // Apply JWT verification to all routes below
 
-router.post("/create", authorizeStaff(['HOTEL_OWNER', 'ADMIN']), createStaff);
 router.get("/hotel/:hotelId", authorizeStaff(['HOTEL_OWNER', 'ADMIN']), getStaffByHotel);
 router.put("/:id", authorizeStaff(['HOTEL_OWNER', 'ADMIN']), updateStaff);
 router.delete("/:id", authorizeStaff(['HOTEL_OWNER', 'ADMIN']), deleteStaff);

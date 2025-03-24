@@ -134,7 +134,7 @@ staffSchema.methods.comparePassword = async function(candidatePassword: string):
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
-    return false;
+    throw new Error('Error comparing passwords');
   }
 };
 // Change from statics to methods
@@ -170,4 +170,4 @@ staffSchema.virtual('accessLevel').get(function(this: IStaffDocument) {
 
 // Create and export the model
 const Staff = mongoose.model<IStaffDocument>('Staff', staffSchema);
-export default Staff;
+export default Staff; 

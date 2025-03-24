@@ -25,51 +25,7 @@ const generateTokens = async (userId: string) => {
   }
 };
 
-// Create new staff member
-export const createStaff = asyncHandler(async (req: Request, res: Response) => {
-  const { hotelId, name, email, phone, role, permissions, password } = req.body;
 
-  // Validate required fields
-  if (!hotelId || !name || !email || !phone || !role || !password) {
-    throw new ApiError(400, "All required fields must be provided");
-  }
-
-  // Validate hotelId format
-  if (!mongoose.Types.ObjectId.isValid(hotelId)) {
-    throw new ApiError(400, "Invalid hotel ID format");
-  }
-
-  // Validate password strength
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  if (!passwordRegex.test(password)) {
-    throw new ApiError(400, "Password must contain at least 8 characters, including uppercase, lowercase, number and special character");
-  }
-
-  // Check if staff already exists
-  const existingStaff = await Staff.findOne({ email: email.toLowerCase() });
-  if (existingStaff) {
-    throw new ApiError(409, "Staff member with this email already exists");
-  }
-
-  const staff = await Staff.create({
-    hotelId,
-    name,
-    email,
-    phone,
-    role,
-    permissions: permissions || [],
-    password
-  });
-
-  const staffResponse = staff.toJSON();
-  const { password: _p, refreshToken: _r, ...cleanedResponse } = staffResponse;
-
-  
-  return res.status(201).json({
-    success: true,
-    data: cleanedResponse
-  });
-});
 
 // Staff login
 export const loginStaff = asyncHandler(async (req: Request, res: Response) => {
@@ -87,7 +43,8 @@ export const loginStaff = asyncHandler(async (req: Request, res: Response) => {
   if (staff.status === 'inactive') {
     throw new ApiError(403, "Account is inactive");
   }
-
+  console.log(password);
+  
   const isPasswordValid = await staff.comparePassword(password);
   if (!isPasswordValid) {
     throw new ApiError(401, "Invalid credentials");

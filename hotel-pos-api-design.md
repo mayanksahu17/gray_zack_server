@@ -297,3 +297,22 @@ GET /api/hotels/{hotelId}/services/{serviceId}/usage
   "updatedAt": "datetime"
 }
 ```
+
+
+
+
+
+### current docs
+
+## root admin init
+```json
+{
+  "name": "Mayank sahu",
+  "email": "mayanksahu0024@gmail.com",
+  "phone": "+1-555-987-6543",
+  "role": "system_admin",
+  "permissions": ["create_hotel", "manage_users", "system_settings"],
+  "password": "SecurePass123!"
+}
+```
+
