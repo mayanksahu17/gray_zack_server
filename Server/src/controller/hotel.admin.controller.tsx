@@ -4,7 +4,11 @@ import { ApiError } from '../utills/ApiError';
 import Hotel from '../models/hotel.model';
 import Staff from '../models/staff.model';
 import mongoose from 'mongoose';
-
+import { auth } from '../lib/mail-service/nodemailer'
+import { render } from '@react-email/render';
+import StaffAssignmentEmail from '../lib/mail-service/mail-templates/notify-staff';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 /**
  * Create a new hotel
  * @route POST /api/hotels
@@ -54,7 +58,7 @@ export const createHotel = asyncHandler(async (req: Request, res: Response) => {
 export const getAllHotels = async (req: Request, res: Response) => {
   try {
     const hotels = await Hotel.find({ isActive: true });
-    
+
     res.status(200).json({
       success: true,
       count: hotels.length,
@@ -77,7 +81,7 @@ export const getAllHotels = async (req: Request, res: Response) => {
 export const getHotelById = async (req: Request, res: Response) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
-    
+
     if (!hotel) {
       return res.status(404).json({
         success: false,
@@ -102,7 +106,7 @@ export const getHotelById = async (req: Request, res: Response) => {
 export const updateHotelProfile = asyncHandler(async (req: Request, res: Response) => {
   const { hotelId } = req.params;
   const updateData = req.body;
-  
+
   const hotel = await Hotel.findOneAndUpdate(
     { _id: hotelId, adminId: req.user._id },
     updateData,
@@ -122,19 +126,126 @@ export const updateHotelProfile = asyncHandler(async (req: Request, res: Respons
 // Create Staff Role
 export const createStaffRole = asyncHandler(async (req: Request, res: Response) => {
   const { hotelId } = req.params;
-  const { role, permissions } = req.body;
+  const {
+    role,
+    permissions,
+    password,
+    status,
+    name,
+    email,
+    phone
+  } = req.body;
 
-  // Validate if hotel belongs to admin
+  // Step 1: Validate if hotel belongs to admin
   const hotel = await Hotel.findOne({ _id: hotelId, adminId: req.user._id });
   if (!hotel) {
-    throw new ApiError(404, "Hotel not found");
+    throw new ApiError(404, "Hotel not found or you don't have permission to add staff to this hotel");
   }
 
-  // Create new role with permissions
-  // This would typically involve updating a roles collection or similar
+  // Step 2: Validate all fields
+  if (!role || !permissions || !password || !name || !email || !phone) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new ApiError(400, "Invalid email format");
+  }
+
+  // Check if staff with this email already exists
+  const existingStaff = await Staff.findOne({ email });
+  if (existingStaff) {
+    throw new ApiError(409, "Staff with this email already exists");
+  }
+
+  // Validate permissions array
+  if (!Array.isArray(permissions) || permissions.length === 0) {
+    throw new ApiError(400, "Permissions must be a non-empty array");
+  }
+
+  // Hash the password
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  // Generate tokens
+  const accessToken = jwt.sign(
+    { email, role },
+    process.env.ACCESS_TOKEN_SECRET || 'your-access-token-secret',
+    { expiresIn: '1d' }
+  );
+
+  const refreshToken = jwt.sign(
+    { email },
+    process.env.REFRESH_TOKEN_SECRET || 'your-refresh-token-secret',
+    { expiresIn: '7d' }
+  );
+
+  // Step 3: Create a new staff member
+  const newStaff = await Staff.create({
+    hotelId: new mongoose.Types.ObjectId(hotelId),
+    name,
+    email,
+    phone,
+    role,
+    permissions,
+    password: hashedPassword,
+    status: status || 'active',
+    refreshToken,
+    accessToken,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  });
+
+  // Step 4: Send email notification
+  let mailConfirmation =  false ;
+  try {
+    const emailHtml = render(
+      <StaffAssignmentEmail
+        name={name}
+        role={role}
+        hotelName={hotel.name}
+        email={email}
+        password={password}
+      />
+    )
+    // Make sure we have a string for the HTML content
+    const htmlContent = typeof emailHtml === 'string'
+      ? emailHtml
+      : (emailHtml instanceof Promise
+        ? await emailHtml
+        : String(emailHtml));
+
+    await auth.sendMail({
+      from: 'scrimsscrown@gmail.com',
+      to: email,
+      subject: `Welcome to ${hotel.name} - Your Staff Account`,
+      html: htmlContent
+    });
+    mailConfirmation = true
+  } catch (error : any) {
+    mailConfirmation = false
+    console.error('Failed to send staff notification email:', error);
+    // Continue with the process even if email fails
+  }
+
+  // Don't include sensitive information in the response
+  const staffResponse = {
+    _id: newStaff._id,
+    name: newStaff.name,
+    email: newStaff.email,
+    phone: newStaff.phone,
+    role: newStaff.role,
+    permissions: newStaff.permissions,
+    status: newStaff.status,
+    createdAt: newStaff.createdAt,
+    mailConfirmation 
+  };
+
   return res.status(201).json({
     success: true,
-    message: "Role created successfully"
+    message: "Staff member created successfully",
+    data: staffResponse
   });
 });
 
@@ -249,9 +360,9 @@ export const getAllHotelStaff = asyncHandler(async (req: Request, res: Response)
 export const getHotelDetails = asyncHandler(async (req: Request, res: Response) => {
   const { hotelId } = req.params;
 
-  const hotel = await Hotel.findOne({ 
-    _id: hotelId, 
-    adminId: req.user._id 
+  const hotel = await Hotel.findOne({
+    _id: hotelId,
+    adminId: req.user._id
   });
 
   if (!hotel) {
@@ -263,3 +374,6 @@ export const getHotelDetails = asyncHandler(async (req: Request, res: Response) 
     data: hotel
   });
 });
+
+
+

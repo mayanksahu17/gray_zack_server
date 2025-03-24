@@ -64,6 +64,7 @@ export const createStaff = asyncHandler(async (req: Request, res: Response) => {
   const staffResponse = staff.toJSON();
   const { password: _p, refreshToken: _r, ...cleanedResponse } = staffResponse;
 
+  
   return res.status(201).json({
     success: true,
     data: cleanedResponse
