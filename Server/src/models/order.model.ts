@@ -25,7 +25,7 @@ enum PaymentStatus {
 
 // Interface for order items
 interface OrderItem {
-  itemId: Types.ObjectId;
+  itemId: string;
   name: string;
   quantity: number;
   price: number;
@@ -66,7 +66,7 @@ export interface IOrder extends Document {
 // Schema for order items
 const OrderItemSchema = new Schema<OrderItem>({
   itemId: {
-    type: Schema.Types.ObjectId,
+    type: String,
     required: [true, 'Item ID is required'],
     ref: 'MenuItem'
   },
