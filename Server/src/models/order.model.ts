@@ -1,24 +1,26 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
-// Define enum types for better type safety
-enum ServiceType {
-  RESTAURANT = 'restaurant',
-  BAR = 'bar',
-  SPA = 'spa',
-  ROOM_SERVICE = 'room_service'
-}
-
+// Define enum types for order status and types
 enum OrderStatus {
   PENDING = 'pending',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
+  CONFIRMED = 'confirmed',
+  PREPARING = 'preparing',
+  READY = 'ready',
+  DELIVERED = 'delivered',
   CANCELLED = 'cancelled'
 }
 
+enum OrderType {
+  DINE_IN = 'dine-in',
+  TAKEOUT = 'takeout',
+  ROOM_SERVICE = 'room-service',
+  MOBILE = 'mobile'
+}
+
 enum PaymentStatus {
+  PENDING = 'pending',
   PAID = 'paid',
-  CHARGED_TO_ROOM = 'charged_to_room',
-  PENDING = 'pending'
+  REFUNDED = 'refunded'
 }
 
 // Interface for order items
@@ -27,36 +29,38 @@ interface OrderItem {
   name: string;
   quantity: number;
   price: number;
-  subtotal: number;
+  specialInstructions?: string;
+  status: OrderStatus;
 }
 
-// Main interface for the ServiceOrder document
-export interface IServiceOrder extends Document {
-  hotelId: Types.ObjectId;
-  guestId: Types.ObjectId;
-  roomId: Types.ObjectId;
-  roomNumber: string;
-  serviceId: Types.ObjectId;
-  serviceType: ServiceType;
-  serviceName: string;
-  items: OrderItem[];
-  employeeId: Types.ObjectId;
+// Interface for customer information
+interface CustomerInfo {
+  name: string;
+  phone: string;
+  email?: string;
+  roomNumber?: string;
+}
+
+// Main interface for the Order document
+export interface IOrder extends Document {
+  restaurantId: Types.ObjectId;
+  orderType: OrderType;
   status: OrderStatus;
+  customerInfo: CustomerInfo;
+  items: OrderItem[];
   totalAmount: number;
-  tax: number;
-  grandTotal: number;
   paymentStatus: PaymentStatus;
-  notes?: string;
-  orderDate: Date;
+  paymentMethod?: string;
+  deliveryInstructions?: string;
+  pickupTime?: Date;
+  tableNumber?: string;
+  splitCheck?: {
+    numberOfSplits: number;
+    splitBy: 'equal' | 'custom';
+    customSplits?: number[];
+  };
   createdAt: Date;
   updatedAt: Date;
-  
-  // Instance methods
-  calculateTotals(): void;
-  isCompleted(): boolean;
-  chargeToRoom(): void;
-  markAsPaid(): void;
-  cancel(reason?: string): void;
 }
 
 // Schema for order items
@@ -64,14 +68,11 @@ const OrderItemSchema = new Schema<OrderItem>({
   itemId: {
     type: Schema.Types.ObjectId,
     required: [true, 'Item ID is required'],
-    ref: 'MenuItem' // Reference to menu items collection
+    ref: 'MenuItem'
   },
   name: {
     type: String,
-    required: [true, 'Item name is required'],
-    trim: true,
-    minlength: [2, 'Item name must be at least 2 characters long'],
-    maxlength: [100, 'Item name cannot exceed 100 characters']
+    required: [true, 'Item name is required']
   },
   quantity: {
     type: Number,
@@ -83,66 +84,66 @@ const OrderItemSchema = new Schema<OrderItem>({
     required: [true, 'Price is required'],
     min: [0, 'Price cannot be negative']
   },
-  subtotal: {
-    type: Number,
-    required: [true, 'Subtotal is required'],
-    min: [0, 'Subtotal cannot be negative'],
-    validate: {
-      validator: function(this: any) {
-        const calculatedSubtotal = this.quantity * this.price;
-        // Allow for minor floating point differences
-        return Math.abs(calculatedSubtotal - this.subtotal) < 0.01;
-      },
-      message: 'Subtotal must equal quantity multiplied by price'
-    }
+  specialInstructions: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'Special instructions cannot exceed 500 characters']
+  },
+  status: {
+    type: String,
+    enum: Object.values(OrderStatus),
+    default: OrderStatus.PENDING
   }
 }, { _id: true });
 
-// Main ServiceOrder Schema
-const ServiceOrderSchema = new Schema<IServiceOrder>({
-  hotelId: {
-    type: Schema.Types.ObjectId,
-    required: [true, 'Hotel ID is required'],
-    ref: 'Hotel'
+// Schema for customer information
+const CustomerInfoSchema = new Schema<CustomerInfo>({
+  name: {
+    type: String,
+    required: [true, 'Customer name is required'],
+    trim: true
   },
-  guestId: {
-    type: Schema.Types.ObjectId,
-    required: [true, 'Guest ID is required'],
-    ref: 'Guest'
+  phone: {
+    type: String,
+    required: [true, 'Phone number is required'],
+    trim: true
   },
-  roomId: {
-    type: Schema.Types.ObjectId,
-    required: [true, 'Room ID is required'],
-    ref: 'Room'
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
   },
   roomNumber: {
     type: String,
-    required: [true, 'Room number is required'],
     trim: true
-  },
-  serviceId: {
+  }
+}, { _id: false });
+
+// Main Order Schema
+const OrderSchema = new Schema<IOrder>({
+  restaurantId: {
     type: Schema.Types.ObjectId,
-    required: [true, 'Service ID is required'],
-    ref: 'Service'
+    required: [true, 'Restaurant ID is required'],
+    ref: 'Restaurant'
   },
-  serviceType: {
+  orderType: {
     type: String,
-    enum: {
-      values: Object.values(ServiceType),
-      message: '{VALUE} is not a valid service type'
-    },
-    required: [true, 'Service type is required']
+    enum: Object.values(OrderType),
+    required: [true, 'Order type is required']
   },
-  serviceName: {
+  status: {
     type: String,
-    required: [true, 'Service name is required'],
-    trim: true,
-    minlength: [2, 'Service name must be at least 2 characters long'],
-    maxlength: [100, 'Service name cannot exceed 100 characters']
+    enum: Object.values(OrderStatus),
+    default: OrderStatus.PENDING
+  },
+  customerInfo: {
+    type: CustomerInfoSchema,
+    required: [true, 'Customer information is required']
   },
   items: {
     type: [OrderItemSchema],
-    required: [true, 'Order items are required'],
+    required: [true, 'Order must contain at least one item'],
     validate: {
       validator: function(items: OrderItem[]) {
         return items.length > 0;
@@ -150,83 +151,45 @@ const ServiceOrderSchema = new Schema<IServiceOrder>({
       message: 'Order must contain at least one item'
     }
   },
-  employeeId: {
-    type: Schema.Types.ObjectId,
-    required: [true, 'Employee ID is required'],
-    ref: 'Employee'
-  },
-  status: {
-    type: String,
-    enum: {
-      values: Object.values(OrderStatus),
-      message: '{VALUE} is not a valid order status'
-    },
-    default: OrderStatus.PENDING
-  },
   totalAmount: {
     type: Number,
     required: [true, 'Total amount is required'],
-    min: [0, 'Total amount cannot be negative'],
-    validate: {
-      validator: function(this: any, total: number) {
-        if (!this.items || this.items.length === 0) return true;
-        
-        const calculatedTotal = this.items.reduce(
-          (sum: number, item: OrderItem) => sum + item.subtotal, 0
-        );
-        
-        // Allow for minor floating point differences
-        return Math.abs(calculatedTotal - total) < 0.01;
-      },
-      message: 'Total amount does not match the sum of item subtotals'
-    }
-  },
-  tax: {
-    type: Number,
-    required: [true, 'Tax is required'],
-    min: [0, 'Tax cannot be negative']
-  },
-  grandTotal: {
-    type: Number,
-    required: [true, 'Grand total is required'],
-    min: [0, 'Grand total cannot be negative'],
-    validate: {
-      validator: function(this: any, grandTotal: number) {
-        const calculatedGrandTotal = this.totalAmount + this.tax;
-        
-        // Allow for minor floating point differences
-        return Math.abs(calculatedGrandTotal - grandTotal) < 0.01;
-      },
-      message: 'Grand total does not match the sum of total amount and tax'
-    }
+    min: [0, 'Total amount cannot be negative']
   },
   paymentStatus: {
     type: String,
-    enum: {
-      values: Object.values(PaymentStatus),
-      message: '{VALUE} is not a valid payment status'
-    },
-    default: PaymentStatus.PENDING,
-    validate: {
-      validator: function(this: any, paymentStatus: string) {
-        // If order is cancelled, payment status should not be PAID
-        if (this.status === OrderStatus.CANCELLED && paymentStatus === PaymentStatus.PAID) {
-          return false;
-        }
-        return true;
-      },
-      message: 'Payment status is inconsistent with order status'
-    }
+    enum: Object.values(PaymentStatus),
+    default: PaymentStatus.PENDING
   },
-  notes: {
+  paymentMethod: {
+    type: String,
+    trim: true
+  },
+  deliveryInstructions: {
     type: String,
     trim: true,
-    maxlength: [500, 'Notes cannot exceed 500 characters']
+    maxlength: [500, 'Delivery instructions cannot exceed 500 characters']
   },
-  orderDate: {
-    type: Date,
-    required: [true, 'Order date is required'],
-    default: Date.now
+  pickupTime: {
+    type: Date
+  },
+  tableNumber: {
+    type: String,
+    trim: true
+  },
+  splitCheck: {
+    numberOfSplits: {
+      type: Number,
+      min: [1, 'Number of splits must be at least 1']
+    },
+    splitBy: {
+      type: String,
+      enum: ['equal', 'custom']
+    },
+    customSplits: [{
+      type: Number,
+      min: [0, 'Split amount cannot be negative']
+    }]
   }
 }, {
   timestamps: true,
@@ -239,94 +202,27 @@ const ServiceOrderSchema = new Schema<IServiceOrder>({
   }
 });
 
-// Indexes for performance
-ServiceOrderSchema.index({ hotelId: 1, createdAt: -1 });
-ServiceOrderSchema.index({ guestId: 1, createdAt: -1 });
-ServiceOrderSchema.index({ roomId: 1 });
-ServiceOrderSchema.index({ status: 1 });
-ServiceOrderSchema.index({ paymentStatus: 1 });
-ServiceOrderSchema.index({ serviceType: 1 });
-ServiceOrderSchema.index({ orderDate: 1 });
-
-// Instance methods
-ServiceOrderSchema.methods.calculateTotals = function(): void {
-  // Calculate total from items
-  this.totalAmount = Number(
-    this.items.reduce((sum: number, item: OrderItem) => sum + item.subtotal, 0).toFixed(2)
-  );
-  
-  // Calculate tax (assuming tax is 10% of totalAmount for this example)
-  this.tax = Number((this.totalAmount * 0.1).toFixed(2));
-  
-  // Calculate grand total
-  this.grandTotal = Number((this.totalAmount + this.tax).toFixed(2));
-};
-
-ServiceOrderSchema.methods.isCompleted = function(): boolean {
-  return this.status === OrderStatus.COMPLETED;
-};
-
-ServiceOrderSchema.methods.chargeToRoom = function(): void {
-  this.paymentStatus = PaymentStatus.CHARGED_TO_ROOM;
-  this.markModified('paymentStatus');
-};
-
-ServiceOrderSchema.methods.markAsPaid = function(): void {
-  this.paymentStatus = PaymentStatus.PAID;
-  this.markModified('paymentStatus');
-};
-
-ServiceOrderSchema.methods.cancel = function(reason?: string): void {
-  if (this.status === OrderStatus.COMPLETED) {
-    throw new Error('Cannot cancel a completed order');
-  }
-  
-  this.status = OrderStatus.CANCELLED;
-  if (reason) {
-    this.notes = this.notes ? `${this.notes}\nCancellation reason: ${reason}` : `Cancellation reason: ${reason}`;
-  }
-  
-  // Reset payment status if it was pending
-  if (this.paymentStatus === PaymentStatus.PENDING) {
-    this.paymentStatus = PaymentStatus.PENDING;
-  }
-  
-  this.markModified('status');
-  this.markModified('notes');
-  this.markModified('paymentStatus');
-};
-
-// Pre-save middleware
-ServiceOrderSchema.pre('save', function(next) {
-  // Ensure item subtotals are calculated correctly
-  for (const item of this.items) {
-    item.subtotal = Number((item.quantity * item.price).toFixed(2));
-  }
-  
-  // Recalculate totals before saving
-  this.calculateTotals();
-  
+// Pre-save middleware to calculate total amount
+OrderSchema.pre('save', function(next) {
+  this.totalAmount = this.items.reduce((total, item) => {
+    return total + (item.price * item.quantity);
+  }, 0);
   next();
 });
 
-// Virtual properties
-ServiceOrderSchema.virtual('itemCount').get(function(this: IServiceOrder) {
-  return this.items.reduce((total: number, item: OrderItem) => total + item.quantity, 0);
-});
-
-ServiceOrderSchema.virtual('averageItemPrice').get(function(this: IServiceOrder) {
-  if (this.items.length === 0) return 0;
-  
-  const totalQuantity = this.items.reduce((total: number, item: OrderItem) => total + item.quantity, 0);
-  return Number((this.totalAmount / totalQuantity).toFixed(2));
-});
+// Indexes for performance
+OrderSchema.index({ restaurantId: 1 });
+OrderSchema.index({ status: 1 });
+OrderSchema.index({ orderType: 1 });
+OrderSchema.index({ 'customerInfo.roomNumber': 1 });
+OrderSchema.index({ createdAt: -1 });
 
 // Create and export the model
-const ServiceOrder = mongoose.model<IServiceOrder>('ServiceOrder', ServiceOrderSchema);
+const Order = mongoose.model<IOrder>('Order', OrderSchema);
 
 export { 
-  ServiceOrder, 
-  ServiceType, 
+  Order, 
   OrderStatus, 
+  OrderType,
   PaymentStatus 
 };

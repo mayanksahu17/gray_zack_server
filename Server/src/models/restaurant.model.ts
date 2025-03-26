@@ -68,26 +68,24 @@ interface MenuItem {
   popular?: boolean;
 }
 
-// Interface for restaurant location
-interface Location {
-  address: string;
-  city: string;
-  state?: string;
-  country: string;
-  postalCode: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  };
+// Interface for table
+interface Table {
+  tableNumber: string;
+  capacity: number;
+  location: 'indoor' | 'outdoor' | 'bar';
+  status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  features?: string[];
+  currentOrder?: Types.ObjectId;
 }
 
 // Main interface for the Restaurant document
 export interface IRestaurant extends Document {
+  hotelId: Types.ObjectId;
   name: string;
   description: string;
   cuisine: CuisineType[];
   priceRange: PriceRange;
-  website?: string;
+  email?: string;
   menuItems: MenuItem[];
   operatingHours: OperatingHours;
   reservationRequired: boolean;
@@ -98,15 +96,18 @@ export interface IRestaurant extends Document {
   reviewCount?: number;
   images?: string[];
   established?: Date;
+  tables: Table[];
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Instance methods
   isOpen(date?: Date): boolean;
   findItemById(itemId: Types.ObjectId | string): MenuItem | null;
   getAvailableItems(): MenuItem[];
   getItemsByCategory(category: DishCategory): MenuItem[];
   getPopularItems(): MenuItem[];
+  getAvailableTables(): Table[];
+  findTableByNumber(tableNumber: string): Table | null;
 }
 
 // Regex for time format validation (HH:MM in 24-hour format)
@@ -151,45 +152,38 @@ const DayHoursSchema = new Schema<DayHours>({
   }
 }, { _id: false });
 
-// Schema for location
-const LocationSchema = new Schema<Location>({
-  address: {
+// Schema for table
+const TableSchema = new Schema<Table>({
+  tableNumber: {
     type: String,
-    required: [true, 'Address is required'],
-    trim: true
+    required: [true, 'Table number is required'],
+    trim: true,
+    unique: true
   },
-  city: {
+  capacity: {
+    type: Number,
+    required: [true, 'Table capacity is required'],
+    min: [1, 'Capacity must be at least 1']
+  },
+  location: {
     type: String,
-    required: [true, 'City is required'],
-    trim: true
+    enum: ['indoor', 'outdoor', 'bar'],
+    required: [true, 'Table location is required']
   },
-  state: {
+  status: {
+    type: String,
+    enum: ['available', 'occupied', 'reserved', 'maintenance'],
+    default: 'available'
+  },
+  features: [{
     type: String,
     trim: true
-  },
-  country: {
-    type: String,
-    required: [true, 'Country is required'],
-    trim: true
-  },
-  postalCode: {
-    type: String,
-    required: [true, 'Postal code is required'],
-    trim: true
-  },
-  coordinates: {
-    latitude: {
-      type: Number,
-      min: -90,
-      max: 90
-    },
-    longitude: {
-      type: Number,
-      min: -180,
-      max: 180
-    }
+  }],
+  currentOrder: {
+    type: Schema.Types.ObjectId,
+    ref: 'Order'
   }
-}, { _id: false });
+}, { _id: true });
 
 // Schema for menu items
 const MenuItemSchema = new Schema<MenuItem>({
@@ -284,6 +278,11 @@ const MenuItemSchema = new Schema<MenuItem>({
 
 // Main Restaurant Schema
 const RestaurantSchema = new Schema<IRestaurant>({
+  hotelId: {
+    type: Schema.Types.ObjectId,
+    required: [true, 'Hotel ID is required'],
+    ref: 'Hotel'
+  },
   name: {
     type: String,
     required: [true, 'Restaurant name is required'],
@@ -321,21 +320,6 @@ const RestaurantSchema = new Schema<IRestaurant>({
     },
     required: [true, 'Price range is required']
   },
-  location: {
-    type: LocationSchema,
-    required: [true, 'Location information is required']
-  },
-  phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    validate: {
-      validator: function(v: string) {
-        // Basic phone validation - can be enhanced based on requirements
-        return /^[+]?[0-9\s\-()]{8,20}$/.test(v);
-      },
-      message: props => `${props.value} is not a valid phone number!`
-    }
-  },
   email: {
     type: String,
     trim: true,
@@ -349,20 +333,6 @@ const RestaurantSchema = new Schema<IRestaurant>({
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
       },
       message: props => `${props.value} is not a valid email address!`
-    }
-  },
-  website: {
-    type: String,
-    trim: true,
-    validate: {
-      validator: function(v: string) {
-        // Skip validation if not provided
-        if (!v) return true;
-        
-        // Basic URL validation
-        return /^(https?:\/\/)[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+$/.test(v);
-      },
-      message: props => `${props.value} is not a valid website URL!`
     }
   },
   menuItems: {
@@ -429,6 +399,18 @@ const RestaurantSchema = new Schema<IRestaurant>({
   },
   established: {
     type: Date
+  },
+  tables: {
+    type: [TableSchema],
+    default: [],
+    validate: {
+      validator: function(tables: Table[]) {
+        // Ensure unique table numbers
+        const uniqueTableNumbers = tables.map((table: Table) => table.tableNumber);
+        return new Set(uniqueTableNumbers).size === uniqueTableNumbers.length;
+      },
+      message: 'Table numbers must be unique'
+    }
   }
 }, {
   timestamps: true,
@@ -532,6 +514,15 @@ RestaurantSchema.virtual('dietaryOptions').get(function(this: IRestaurant) {
     glutenFree: hasGlutenFree
   };
 });
+
+// Instance methods for table management
+RestaurantSchema.methods.getAvailableTables = function(): Table[] {
+  return this.tables.filter((table: Table) => table.status === 'available');
+};
+
+RestaurantSchema.methods.findTableByNumber = function(tableNumber: string): Table | null {
+  return this.tables.find((table: Table) => table.tableNumber === tableNumber) || null;
+};
 
 // Create and export the model
 const Restaurant = mongoose.model<IRestaurant>('Restaurant', RestaurantSchema);
