@@ -171,3 +171,5 @@ staffSchema.virtual('accessLevel').get(function(this: IStaffDocument) {
 // Create and export the model
 const Staff = mongoose.model<IStaffDocument>('Staff', staffSchema);
 export default Staff; 
+
+export { StaffRole };
