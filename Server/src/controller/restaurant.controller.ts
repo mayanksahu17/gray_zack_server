@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Restaurant, IRestaurant } from '../models/restaurant.model'; // Adjust import path as needed
+import { Restaurant, IRestaurant , CuisineType, PriceRange } from '../models/restaurant.model'; // Adjust import path as needed
 import mongoose from 'mongoose';
 import { ApiError } from '../utills/ApiError';
 import { asyncHandler } from '../utills/asyncHandler';
@@ -7,12 +7,108 @@ import Hotel from '../models/hotel.model';
 import {Order} from '../models/order.model';
 import { generateQRCodeImage } from '../utills/qrCodeGenerator';
 
+
+
+// Validation helper function
+const validateRestaurantData = (restaurantData: any) => {
+  const errors: string[] = [];
+
+  // Name validation
+  if (!restaurantData.name) {
+    errors.push('Restaurant name is required');
+  } else {
+    if (restaurantData.name.length < 2) {
+      errors.push('Restaurant name must be at least 2 characters long');
+    }
+    if (restaurantData.name.length > 100) {
+      errors.push('Restaurant name cannot exceed 100 characters');
+    }
+  }
+
+  // Description validation
+  if (!restaurantData.description) {
+    errors.push('Restaurant description is required');
+  } else {
+    if (restaurantData.description.length > 1000) {
+      errors.push('Description cannot exceed 1000 characters');
+    }
+  }
+
+  // Cuisine validation
+  if (!restaurantData.cuisine || !Array.isArray(restaurantData.cuisine) || restaurantData.cuisine.length === 0) {
+    errors.push('At least one cuisine type is required');
+  } else {
+    const validCuisineTypes = Object.values(CuisineType);
+    const invalidCuisines = restaurantData.cuisine.filter(
+      (cuisine: string) => !validCuisineTypes.includes(cuisine as CuisineType)
+    );
+    if (invalidCuisines.length > 0) {
+      errors.push(`Invalid cuisine types: ${invalidCuisines.join(', ')}`);
+    }
+    if (new Set(restaurantData.cuisine).size !== restaurantData.cuisine.length) {
+      errors.push('Cuisine types must be unique');
+    }
+  }
+
+  // Price range validation
+  if (!restaurantData.priceRange || !Object.values(PriceRange).includes(restaurantData.priceRange as PriceRange)) {
+    errors.push('Valid price range is required');
+  }
+
+  // Email validation (optional)
+  if (restaurantData.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(restaurantData.email)) {
+      errors.push('Invalid email address');
+    }
+  }
+
+  // Capacity validation
+  if (!restaurantData.capacity || restaurantData.capacity < 1) {
+    errors.push('Seating capacity must be at least 1');
+  }
+
+  // Menu items validation
+  if (!restaurantData.menuItems || !Array.isArray(restaurantData.menuItems) || restaurantData.menuItems.length === 0) {
+    errors.push('At least one menu item is required');
+  }
+
+  // Images validation (optional)
+  if (restaurantData.images && Array.isArray(restaurantData.images)) {
+    const invalidUrls = restaurantData.images.filter(
+      (url: string) => !/^(https?:\/\/|\/|\.\.\/|\.\/)[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+$/.test(url)
+    );
+    if (invalidUrls.length > 0) {
+      errors.push(`Invalid image URLs: ${invalidUrls.join(', ')}`);
+    }
+  }
+
+  // Tables validation
+  if (restaurantData.tables && Array.isArray(restaurantData.tables)) {
+    const tableNumbers = restaurantData.tables.map((table: any) => table.tableNumber);
+    if (new Set(tableNumbers).size !== tableNumbers.length) {
+      errors.push('Table numbers must be unique');
+    }
+  }
+
+  return errors;
+};
+
+
 export const createRestaurant = asyncHandler(async (req: Request, res: Response) => {
   const { hotelId, ...restaurantData } = req.body;
 
   // Validate hotelId
   if (!hotelId || !mongoose.Types.ObjectId.isValid(hotelId)) {
     throw new ApiError(400, "Valid hotel ID is required");
+  }
+
+  // Validate restaurant data
+  const validationErrors = validateRestaurantData(restaurantData);
+  if (validationErrors.length > 0) {
+    console.log(validationErrors);
+    
+    throw new ApiError(400, "Validation failed", validationErrors);
   }
 
   // Verify hotel belongs to the admin
@@ -23,6 +119,17 @@ export const createRestaurant = asyncHandler(async (req: Request, res: Response)
 
   if (!hotel) {
     throw new ApiError(404, "Hotel not found or you don't have permission to add restaurants to this hotel");
+  }
+
+  // Additional business logic validations
+  // Check if restaurant with same name already exists in the hotel
+  const existingRestaurant = await Restaurant.findOne({ 
+    hotelId, 
+    name: restaurantData.name 
+  });
+
+  if (existingRestaurant) {
+    throw new ApiError(409, "A restaurant with this name already exists in the hotel");
   }
 
   // Create new restaurant with hotel association
@@ -39,7 +146,6 @@ export const createRestaurant = asyncHandler(async (req: Request, res: Response)
     data: savedRestaurant
   });
 });
-
 export const getAllRestaurants = async (req: Request, res: Response) => {
   try {
     const { 
@@ -51,7 +157,7 @@ export const getAllRestaurants = async (req: Request, res: Response) => {
       glutenFree, 
       page = 1, 
       limit = 10 
-    } = req.query;
+    } = req.query;    
 
     const queryConditions: any = {};
 
@@ -65,7 +171,7 @@ export const getAllRestaurants = async (req: Request, res: Response) => {
     if (vegan === 'true') dietaryFilters.push({ 'menuItems.vegan': true });
     if (glutenFree === 'true') dietaryFilters.push({ 'menuItems.glutenFree': true });
 
-    if (dietaryFilters.length > 0) {
+    if (dietaryFilters?.length > 0) {
       queryConditions.$or = dietaryFilters;
     }
 
@@ -78,7 +184,7 @@ export const getAllRestaurants = async (req: Request, res: Response) => {
 
     res.status(200).json({
       status: 'success',
-      results: restaurants.length,
+      results: restaurants?.length,
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),

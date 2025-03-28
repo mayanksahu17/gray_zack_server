@@ -51,7 +51,7 @@ interface OperatingHours {
 
 // Interface for menu items
 interface MenuItem {
-  itemId: Types.ObjectId;
+  itemId: string;
   name: string;
   description?: string;
   price: number;
@@ -188,8 +188,8 @@ const TableSchema = new Schema<Table>({
 // Schema for menu items
 const MenuItemSchema = new Schema<MenuItem>({
   itemId: {
-    type: Schema.Types.ObjectId,
-    required: [true, 'Item ID is required'],
+    type: String,
+    required: [false, 'Item ID is required'],
     // Custom itemId to allow the same dishes across different restaurants
   },
   name: {
@@ -425,6 +425,7 @@ const RestaurantSchema = new Schema<IRestaurant>({
 
 // Pre-save middleware to check for duplicate item IDs
 RestaurantSchema.pre('save', function(next) {
+  
   if (!this.menuItems || this.menuItems.length === 0) {
     return next();
   }

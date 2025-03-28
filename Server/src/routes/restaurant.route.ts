@@ -20,7 +20,7 @@ router.get('/:id/menu', restaurantController.getRestaurantMenu);
 router.post(
   '/',
   verifyJWT,
-  authorizePermission([AdminRole.HOTEL_ADMIN]),
+  authorizePermission([AdminRole.HOTEL_ADMIN] ),
   restaurantController.createRestaurant
 );
 
