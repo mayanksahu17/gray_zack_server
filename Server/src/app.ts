@@ -14,6 +14,16 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
 app.use(express.static("public"));
 app.use(cookieParser());
+app.use((req, res, next) => {
+    const startTime = Date.now();
+
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    });
+
+    next();
+});
 
 app.use((req, res, next) => {
     const startTime = Date.now();
