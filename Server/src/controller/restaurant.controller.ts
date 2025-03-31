@@ -1,641 +1,957 @@
 import { Request, Response } from 'express';
-import { Restaurant, IRestaurant , CuisineType, PriceRange } from '../models/restaurant.model'; // Adjust import path as needed
 import mongoose from 'mongoose';
-import { ApiError } from '../utills/ApiError';
-import { asyncHandler } from '../utills/asyncHandler';
-import Hotel from '../models/hotel.model';
-import {Order} from '../models/order.model';
-import { generateQRCodeImage } from '../utills/qrCodeGenerator';
+import { Restaurant, MenuItem,  } from '../models/restaurant.model';
 
+// ==========================================
+// Restaurant Information Controllers
+// ==========================================
 
-
-// Validation helper function
-const validateRestaurantData = (restaurantData: any) => {
-  const errors: string[] = [];
-
-  // Name validation
-  if (!restaurantData.name) {
-    errors.push('Restaurant name is required');
-  } else {
-    if (restaurantData.name.length < 2) {
-      errors.push('Restaurant name must be at least 2 characters long');
-    }
-    if (restaurantData.name.length > 100) {
-      errors.push('Restaurant name cannot exceed 100 characters');
-    }
-  }
-
-  // Description validation
-  if (!restaurantData.description) {
-    errors.push('Restaurant description is required');
-  } else {
-    if (restaurantData.description.length > 1000) {
-      errors.push('Description cannot exceed 1000 characters');
-    }
-  }
-
-  // Cuisine validation
-  if (!restaurantData.cuisine || !Array.isArray(restaurantData.cuisine) || restaurantData.cuisine.length === 0) {
-    errors.push('At least one cuisine type is required');
-  } else {
-    const validCuisineTypes = Object.values(CuisineType);
-    const invalidCuisines = restaurantData.cuisine.filter(
-      (cuisine: string) => !validCuisineTypes.includes(cuisine as CuisineType)
-    );
-    if (invalidCuisines.length > 0) {
-      errors.push(`Invalid cuisine types: ${invalidCuisines.join(', ')}`);
-    }
-    if (new Set(restaurantData.cuisine).size !== restaurantData.cuisine.length) {
-      errors.push('Cuisine types must be unique');
-    }
-  }
-
-  // Price range validation
-  if (!restaurantData.priceRange || !Object.values(PriceRange).includes(restaurantData.priceRange as PriceRange)) {
-    errors.push('Valid price range is required');
-  }
-
-  // Email validation (optional)
-  if (restaurantData.email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(restaurantData.email)) {
-      errors.push('Invalid email address');
-    }
-  }
-
-  // Capacity validation
-  if (!restaurantData.capacity || restaurantData.capacity < 1) {
-    errors.push('Seating capacity must be at least 1');
-  }
-
-  // Menu items validation
-  if (!restaurantData.menuItems || !Array.isArray(restaurantData.menuItems) || restaurantData.menuItems.length === 0) {
-    errors.push('At least one menu item is required');
-  }
-
-  // Images validation (optional)
-  if (restaurantData.images && Array.isArray(restaurantData.images)) {
-    const invalidUrls = restaurantData.images.filter(
-      (url: string) => !/^(https?:\/\/|\/|\.\.\/|\.\/)[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+$/.test(url)
-    );
-    if (invalidUrls.length > 0) {
-      errors.push(`Invalid image URLs: ${invalidUrls.join(', ')}`);
-    }
-  }
-
-  // Tables validation
-  if (restaurantData.tables && Array.isArray(restaurantData.tables)) {
-    const tableNumbers = restaurantData.tables.map((table: any) => table.tableNumber);
-    if (new Set(tableNumbers).size !== tableNumbers.length) {
-      errors.push('Table numbers must be unique');
-    }
-  }
-
-  return errors;
-};
-
-
-export const createRestaurant = asyncHandler(async (req: Request, res: Response) => {
-  const { hotelId, ...restaurantData } = req.body;
-
-  // Validate hotelId
-  if (!hotelId || !mongoose.Types.ObjectId.isValid(hotelId)) {
-    throw new ApiError(400, "Valid hotel ID is required");
-  }
-
-  // Validate restaurant data
-  const validationErrors = validateRestaurantData(restaurantData);
-  if (validationErrors.length > 0) {
-    console.log(validationErrors);
-    
-    throw new ApiError(400, "Validation failed", validationErrors);
-  }
-
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(404, "Hotel not found or you don't have permission to add restaurants to this hotel");
-  }
-
-  // Additional business logic validations
-  // Check if restaurant with same name already exists in the hotel
-  const existingRestaurant = await Restaurant.findOne({ 
-    hotelId, 
-    name: restaurantData.name 
-  });
-
-  if (existingRestaurant) {
-    throw new ApiError(409, "A restaurant with this name already exists in the hotel");
-  }
-
-  // Create new restaurant with hotel association
-  const newRestaurant = new Restaurant({
-    ...restaurantData,
-    hotelId: new mongoose.Types.ObjectId(hotelId)
-  });
-  
-  const savedRestaurant = await newRestaurant.save();
-
-  return res.status(201).json({
-    success: true,
-    message: "Restaurant created successfully",
-    data: savedRestaurant
-  });
-});
-export const getAllRestaurants = async (req: Request, res: Response) => {
-  try {
-    const { 
-      cuisine, 
-      priceRange, 
-      city, 
-      vegetarian, 
-      vegan, 
-      glutenFree, 
-      page = 1, 
-      limit = 10 
-    } = req.query;    
-
-    const queryConditions: any = {};
-
-    if (cuisine) queryConditions.cuisine = { $in: (cuisine as string).split(',') };
-    if (priceRange) queryConditions.priceRange = priceRange;
-    if (city) queryConditions['location.city'] = city;
-
-    // Dietary options filter
-    const dietaryFilters: any[] = [];
-    if (vegetarian === 'true') dietaryFilters.push({ 'menuItems.vegetarian': true });
-    if (vegan === 'true') dietaryFilters.push({ 'menuItems.vegan': true });
-    if (glutenFree === 'true') dietaryFilters.push({ 'menuItems.glutenFree': true });
-
-    if (dietaryFilters?.length > 0) {
-      queryConditions.$or = dietaryFilters;
-    }
-
-    const restaurants = await Restaurant.find(queryConditions)
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit))
-      .select('-menuItems'); // Exclude menu items to reduce payload
-
-    const total = await Restaurant.countDocuments(queryConditions);
-
-    res.status(200).json({
-      status: 'success',
-      results: restaurants?.length,
-      total,
-      page: Number(page),
-      totalPages: Math.ceil(total / Number(limit)),
-      data: restaurants
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Error fetching restaurants'
-    });
-  }
-};
-
+/**
+ * Get restaurant details by ID
+ */
 export const getRestaurantById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid restaurant ID'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
     const restaurant = await Restaurant.findById(id);
 
     if (!restaurant) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Restaurant not found'
-      });
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    res.status(200).json({
-      status: 'success',
-      data: restaurant
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Error fetching restaurant'
-    });
+    return res.status(200).json({ success: true, data: restaurant });
+  } catch (error : any) {
+    console.error('Error fetching restaurant:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
-export const updateRestaurant = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const updateData = req.body;
+/**
+ * Create a new restaurant
+ */
+export const createRestaurant = async (req: Request, res: Response) => {
+  try {
+    const restaurantData = req.body;
 
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
+    const restaurant = new Restaurant(restaurantData);
+    await restaurant.validate();
+    await restaurant.save();
+
+    return res.status(201).json({ success: true, data: restaurant });
+  } catch (error : any) {
+    console.error('Error creating restaurant:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
+};
 
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
-
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to update this restaurant");
-  }
-
-  // Update restaurant
-  const updatedRestaurant = await Restaurant.findByIdAndUpdate(
-    id,
-    updateData,
-    { new: true, runValidators: true }
-  );
-
-  return res.status(200).json({
-    success: true,
-    message: "Restaurant updated successfully",
-    data: updatedRestaurant
-  });
-});
-
-export const deleteRestaurant = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
-  }
-
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
-
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to delete this restaurant");
-  }
-
-  // Delete restaurant
-  await Restaurant.findByIdAndDelete(id);
-
-  return res.status(200).json({
-    success: true,
-    message: "Restaurant deleted successfully"
-  });
-});
-
-// Additional specialized controllers
-
-export const checkRestaurantAvailability = async (req: Request, res: Response) => {
+/**
+ * Update restaurant details
+ */
+export const updateRestaurant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { date } = req.query;
+    const updateData = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid restaurant ID'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
-    const restaurant = await Restaurant.findById(id);
+    const restaurant = await Restaurant.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
 
     if (!restaurant) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Restaurant not found'
-      });
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const checkDate = date ? new Date(date as string) : new Date();
-    const isOpen = restaurant.isOpen(checkDate);
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        isOpen,
-        checkDate
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Error checking restaurant availability'
-    });
+    return res.status(200).json({ success: true, data: restaurant });
+  } catch (error : any) {
+    console.error('Error updating restaurant:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
+/**
+ * Check if restaurant is currently open
+//  */
+// export const checkRestaurantOpen = async (req: Request, res: Response) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
+
+//     const restaurant = await Restaurant.findById(id);
+
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
+
+//     const isOpen = restaurant.isOpen();
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         isOpen,
+//         currentDay: new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase(),
+//         hours: restaurant.operatingHours
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Error checking restaurant status:', error);
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
+// ==========================================
+// Menu Management Controllers
+// ==========================================
+
+/**
+ * Get restaurant's complete menu
+ */
 export const getRestaurantMenu = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { 
-      category, 
-      vegetarian, 
-      vegan, 
-      glutenFree, 
-      availableOnly 
-    } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid restaurant ID'
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(id, 'name menu');
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        restaurantName: restaurant.name,
+        menu: restaurant.menu
+      }
+    });
+  } catch (error : any) {
+    console.error('Error fetching menu:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Add a new menu category
+ */
+export const addMenuCategory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const categoryData = req.body
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' })
+    }
+
+    const restaurant = await Restaurant.findById(id)
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' })
+    }
+
+    const existingCategoryIndex = restaurant.menu.findIndex(c => c.id === categoryData.id)
+
+    if (existingCategoryIndex !== -1) {
+      // Category exists, append new items
+      const existingCategory = restaurant.menu[existingCategoryIndex]
+      const newItems = categoryData.items || []
+
+      // Filter out items with duplicate IDs
+      const existingItemIds = new Set(existingCategory.items.map(item => item.id))
+      const uniqueNewItems = newItems.filter((item : any) => !existingItemIds.has(item.id))
+
+      if (uniqueNewItems.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'All item IDs already exist in this category'
+        })
+      }
+
+      // Append unique new items to the existing category
+      restaurant.menu[existingCategoryIndex].items.push(...uniqueNewItems)
+
+      await restaurant.save()
+      return res.status(200).json({
+        success: true,
+        message: 'New items added to existing category',
+        updatedCategory: restaurant.menu[existingCategoryIndex]
+      })
+    } else {
+      // Category does not exist — create new category
+      restaurant.menu.push(categoryData)
+      await restaurant.save()
+
+      return res.status(201).json({
+        success: true,
+        message: 'New menu category added successfully',
+        newCategory: categoryData
+      })
+    }
+  } catch (error: any) {
+    console.error('Error adding or updating menu category:', error)
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    })
+  }
+}
+
+
+/**
+ * Update an existing menu category
+//  */
+// export const updateMenuCategory = async (req: Request, res: Response) => {
+//   try {
+//     const { restaurantId, categoryId } = req.params;
+//     const updateData = req.body;
+
+//     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
+
+//     const restaurant = await Restaurant.findById(restaurantId);
+
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
+
+//     const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+//     if (categoryIndex === -1) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `Category with ID ${categoryId} not found`
+//       });
+//     }
+
+//     // Preserve items if not provided in update
+//     if (!updateData.items) {
+//       updateData.items = restaurant.menu[categoryIndex].items;
+//     }
+     
+//     restaurant.menu[categoryIndex] = {
+//       ...restaurant.menu[categoryIndex].toObject(),
+//       ...updateData
+//     };
+
+//     await restaurant.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       data: restaurant.menu[categoryIndex],
+//       message: 'Menu category updated successfully'
+//     });
+//   } catch (error : any) {
+//     console.error('Error updating menu category:', error);
+//     if (error.name === 'ValidationError') {
+//       return res.status(400).json({ success: false, message: error.message });
+//     }
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
+/**
+ * Delete a menu category
+ */
+export const deleteMenuCategory = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, categoryId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+    if (categoryIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Category with ID ${categoryId} not found`
       });
+    }
+
+    restaurant.menu.splice(categoryIndex, 1);
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Menu category deleted successfully'
+    });
+  } catch (error : any) {
+    console.error('Error deleting menu category:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Add a menu item to a category
+ */
+export const addMenuItem = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, categoryId } = req.params;
+    const itemData = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+    if (categoryIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Category with ID ${categoryId} not found`
+      });
+    }
+
+    // Check if item ID already exists in this category
+    const existingItem = restaurant.menu[categoryIndex].items.find(i => i.id === itemData.id);
+    if (existingItem) {
+      return res.status(400).json({
+        success: false,
+        message: `Item with ID ${itemData.id} already exists in this category`
+      });
+    }
+
+    restaurant.menu[categoryIndex].items.push(itemData);
+    await restaurant.save();
+
+    return res.status(201).json({
+      success: true,
+      data: itemData,
+      message: 'Menu item added successfully'
+    });
+  } catch ( error: any) {
+    console.error('Error adding menu item:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Update a menu item
+//  */
+// export const updateMenuItem = async (req: Request, res: Response) => {
+//   try {
+//     const { restaurantId, categoryId, itemId } = req.params;
+//     const updateData = req.body;
+
+//     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
+
+//     const restaurant = await Restaurant.findById(restaurantId);
+
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
+
+//     const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+//     if (categoryIndex === -1) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `Category with ID ${categoryId} not found`
+//       });
+//     }
+
+//     const itemIndex = restaurant.menu[categoryIndex].items.findIndex(i => i.id === itemId);
+//     if (itemIndex === -1) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `Item with ID ${itemId} not found in this category`
+//       });
+//     }
+
+//     restaurant.menu[categoryIndex].items[itemIndex] = {
+//       ...restaurant.menu[categoryIndex].items[itemIndex].toObject(),
+//       ...updateData
+//     };
+
+//     await restaurant.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       data: restaurant.menu[categoryIndex].items[itemIndex],
+//       message: 'Menu item updated successfully'
+//     });
+//   } catch (error : any) {
+//     console.error('Error updating menu item:', error);
+//     if (error.name === 'ValidationError') {
+//       return res.status(400).json({ success: false, message: error.message });
+//     }
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
+/**
+ * Delete a menu item
+ */
+export const deleteMenuItem = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, categoryId, itemId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+    if (categoryIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Category with ID ${categoryId} not found`
+      });
+    }
+
+    const itemIndex = restaurant.menu[categoryIndex].items.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Item with ID ${itemId} not found in this category`
+      });
+    }
+
+    restaurant.menu[categoryIndex].items.splice(itemIndex, 1);
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Menu item deleted successfully'
+    });
+  } catch (error : any) {
+    console.error('Error deleting menu item:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Get popular menu items
+//  */
+// export const getPopularItems = async (req: Request, res: Response) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
+
+//     const restaurant = await Restaurant.findById(id);
+
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
+
+//     const popularItems = restaurant.getPopularItems();
+
+//     return res.status(200).json({
+//       success: true,
+//       data: popularItems
+//     });
+//   } catch (error : any) {
+//     console.error('Error fetching popular items:', error);
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
+// ==========================================
+// Table Management Controllers
+// ==========================================
+
+/**
+ * Get all tables for a restaurant
+ */
+export const getRestaurantTables = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(id, 'tables');
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: restaurant.tables
+    });
+  } catch (error : any) {
+    console.error('Error fetching tables:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Add a new table to the restaurant
+ */
+export const addRestaurantTable = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const tableData = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
     const restaurant = await Restaurant.findById(id);
 
     if (!restaurant) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Restaurant not found'
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    // Check if table number already exists
+    const existingTable = restaurant.tables.find(t => t.tableNumber === tableData.tableNumber);
+    if (existingTable) {
+      return res.status(400).json({
+        success: false,
+        message: `Table with number ${tableData.tableNumber} already exists`
       });
     }
 
-    let menuItems = restaurant.menuItems;
+    restaurant.tables.push(tableData);
+    await restaurant.save();
 
-    // Apply filters
-    if (category) {
-      menuItems = menuItems.filter(item => item.category === category);
-    }
-    if (vegetarian === 'true') {
-      menuItems = menuItems.filter(item => item.vegetarian);
-    }
-    if (vegan === 'true') {
-      menuItems = menuItems.filter(item => item.vegan);
-    }
-    if (glutenFree === 'true') {
-      menuItems = menuItems.filter(item => item.glutenFree);
-    }
-    if (availableOnly === 'true') {
-      menuItems = menuItems.filter(item => item.available);
-    }
-
-    res.status(200).json({
-      status: 'success',
-      results: menuItems.length,
-      data: menuItems
+    return res.status(201).json({
+      success: true,
+      data: tableData,
+      message: 'Table added successfully'
     });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Error fetching restaurant menu'
-    });
+  } catch (error : any) {
+    console.error('Error adding table:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
-// Menu Customization
-export const addMenuItem = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const menuItemData = req.body;
+/**
+ * Update a table's information
+ */
+// export const updateRestaurantTable = async (req: Request, res: Response) => {
+//   try {
+//     const { restaurantId, tableNumber } = req.params;
+//     const updateData = req.body;
 
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
-  }
+//     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
 
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
+//     const restaurant = await Restaurant.findById(restaurantId);
 
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
 
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to modify this restaurant");
-  }
+//     const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+//     if (tableIndex === -1) {
+//       return res.status(404).json({
+//         success: false,
+//         message: `Table with number ${tableNumber} not found`
+//       });
+//     }
 
-  // Add new menu item
-  restaurant.menuItems.push(menuItemData);
-  await restaurant.save();
+//     // If tableNumber is being updated, ensure it doesn't conflict with existing tables
+//     if (updateData.tableNumber && updateData.tableNumber !== tableNumber) {
+//       const existingTable = restaurant.tables.find(t => t.tableNumber === updateData.tableNumber);
+//       if (existingTable) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Table with number ${updateData.tableNumber} already exists`
+//         });
+//       }
+//     }
 
-  return res.status(201).json({
-    success: true,
-    message: "Menu item added successfully",
-    data: restaurant.menuItems[restaurant.menuItems.length - 1]
-  });
-});
+//     restaurant.tables[tableIndex] = {
+//       ...restaurant.tables[tableIndex].toObject(),
+//       ...updateData
+//     };
 
-export const updateMenuItem = asyncHandler(async (req: Request, res: Response) => {
-  const { id, itemId } = req.params;
-  const updateData = req.body;
+//     await restaurant.save();
 
-  // Validate IDs
-  if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(itemId)) {
-    throw new ApiError(400, "Invalid ID format");
-  }
+//     return res.status(200).json({
+//       success: true,
+//       data: restaurant.tables[tableIndex],
+//       message: 'Table updated successfully'
+//     });
+//   } catch (error : any) {
+//     console.error('Error updating table:', error);
+//     if (error.name === 'ValidationError') {
+//       return res.status(400).json({ success: false, message: error.message });
+//     }
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
 
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
+/**
+ * Delete a table
+ */
+export const deleteRestaurantTable = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, tableNumber } = req.params;
 
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to modify this restaurant");
-  }
-
-  // Find and update menu item
-  const menuItem = restaurant.menuItems.find(item => item.itemId.toString() === itemId);
-  if (!menuItem) {
-    throw new ApiError(404, "Menu item not found");
-  }
-
-  Object.assign(menuItem, updateData);
-  await restaurant.save();
-
-  return res.status(200).json({
-    success: true,
-    message: "Menu item updated successfully",
-    data: menuItem
-  });
-});
-
-// Table Management
-export const addTable = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const tableData = req.body;
-
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
-  }
-
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
-
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to modify this restaurant");
-  }
-
-  // Add table to restaurant
-  if (!restaurant.tables) {
-    restaurant.tables = [];
-  }
-  restaurant.tables.push(tableData);
-  await restaurant.save();
-
-  return res.status(201).json({
-    success: true,
-    message: "Table added successfully",
-    data: restaurant.tables[restaurant.tables.length - 1]
-  });
-});
-
-// Room Service
-export const createRoomServiceOrder = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const orderData = req.body;
-
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
-  }
-
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
-
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to create orders for this restaurant");
-  }
-
-  // Create room service order
-  const order = await Order.create({
-    ...orderData,
-    restaurantId: id,
-    orderType: 'room-service',
-    status: 'pending'
-  });
-
-  return res.status(201).json({
-    success: true,
-    message: "Room service order created successfully",
-    data: order
-  });
-});
-
-// Mobile Ordering
-export const generateQRCode = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
-  }
-
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
-  }
-
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
-
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to generate QR code for this restaurant");
-  }
-
-  // Generate QR code (implementation depends on QR code library)
-  const menuUrl = `${process.env.FRONTEND_URL}/menu/${id}`;
-  const qrCode = await generateQRCodeImage(menuUrl);
-
-  return res.status(200).json({
-    success: true,
-    data: {
-      qrCode,
-      menuUrl,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
-  });
-});
 
-export const createMobileOrder = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const orderData = req.body;
+    const restaurant = await Restaurant.findById(restaurantId);
 
-  // Validate restaurant ID
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    throw new ApiError(400, "Invalid restaurant ID");
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+    if (tableIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Table with number ${tableNumber} not found`
+      });
+    }
+
+    // Check if table is in use
+    if (restaurant.tables[tableIndex].status === 'occupied') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete table ${tableNumber} because it is currently occupied`
+      });
+    }
+
+    restaurant.tables.splice(tableIndex, 1);
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Table deleted successfully'
+    });
+  } catch (error : any) {
+    console.error('Error deleting table:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
+};
 
-  // Find restaurant and verify hotel ownership
-  const restaurant = await Restaurant.findById(id);
-  if (!restaurant) {
-    throw new ApiError(404, "Restaurant not found");
+/**
+ * Get available tables
+//  */
+// export const getAvailableTables = async (req: Request, res: Response) => {
+//   try {
+//     const { id } = req.params;
+
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
+
+//     const restaurant = await Restaurant.findById(id);
+
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
+
+//     const availableTables = restaurant.getAvailableTables();
+
+//     return res.status(200).json({
+//       success: true,
+//       data: availableTables
+//     });
+//   } catch (error : any) {
+//     console.error('Error fetching available tables:', error);
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
+/**
+ * Update table status (available, occupied, reserved, maintenance)
+ */
+export const updateTableStatus = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, tableNumber } = req.params;
+    const { status, orderId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    if (orderId && !mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ success: false, message: 'Invalid order ID format' });
+    }
+
+    const validStatuses = ['available', 'occupied', 'reserved', 'maintenance'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+      });
+    }
+
+    const restaurant = await Restaurant.findById(restaurantId);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+    if (tableIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Table with number ${tableNumber} not found`
+      });
+    }
+
+    restaurant.tables[tableIndex].status = status;
+    
+    // Update current order if provided
+    if (status === 'occupied' && orderId) {
+      restaurant.tables[tableIndex].currentOrder = orderId;
+    } else if (status === 'available') {
+      restaurant.tables[tableIndex].currentOrder = undefined;
+    }
+
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      data: restaurant.tables[tableIndex],
+      message: `Table status updated to ${status}`
+    });
+  } catch (error : any) {
+    console.error('Error updating table status:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
+};
 
-  // Verify hotel belongs to the admin
-  const hotel = await Hotel.findOne({ 
-    _id: restaurant.hotelId, 
-    adminId: req.user._id 
-  });
+// ==========================================
+// POS-Specific Controllers
+// ==========================================
 
-  if (!hotel) {
-    throw new ApiError(403, "You don't have permission to create orders for this restaurant");
+/**
+ * Search menu items across all categories
+ */
+export const searchMenuItems = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { query } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'Search query is required' });
+    }
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const searchTerm = String(query).toLowerCase();
+    const results: Array<{item: MenuItem, category: string}> = [];
+
+    restaurant.menu.forEach(category => {
+      const matchedItems = category.items.filter(item => 
+        item.name.toLowerCase().includes(searchTerm) || 
+        (item.description && item.description.toLowerCase().includes(searchTerm))
+      );
+
+      matchedItems.forEach(item => {
+        results.push({
+          item,
+          category: category.name
+        });
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: results
+    });
+  } catch (error : any) {
+    console.error('Error searching menu items:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
+};
 
-  // Create mobile order
-  const order = await Order.create({
-    ...orderData,
-    restaurantId: id,
-    orderType: 'mobile',
-    status: 'pending'
-  });
+/**
+ * Get quick stats for the restaurant dashboard
+ */
+// export const getRestaurantStats = async (req: Request, res: Response) => {
+//   try {
+//     const { id } = req.params;
 
-  return res.status(201).json({
-    success: true,
-    message: "Mobile order created successfully",
-    data: order
-  });
-});
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+//     }
+
+//     const restaurant = await Restaurant.findById(id);
+
+//     if (!restaurant) {
+//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
+//     }
+
+//     // Count tables by status
+//     const tableStats = {
+//       total: restaurant.tables.length,
+//       available: restaurant.tables.filter(t => t.status === 'available').length,
+//       occupied: restaurant.tables.filter(t => t.status === 'occupied').length,
+//       reserved: restaurant.tables.filter(t => t.status === 'reserved').length,
+//       maintenance: restaurant.tables.filter(t => t.status === 'maintenance').length
+//     };
+
+//     // Count menu items by category
+//     const menuStats = restaurant.menu.map(category => ({
+//       category: category.name,
+//       itemCount: category.items.length
+//     }));
+
+//     // Calculate menu diversity
+//     const totalItems = restaurant.menu.reduce((sum, category) => sum + category.items.length, 0);
+
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         isOpen: restaurant.isOpen(),
+//         tableStats,
+//         menuStats,
+//         totalItems,
+//         totalCategories: restaurant.menu.length,
+//         averageRating: restaurant.averageRating,
+//         reviewCount: restaurant.reviewCount
+//       }
+//     });
+//   } catch (error : any) {
+//     console.error('Error fetching restaurant stats:', error);
+//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
+/**
+ * Export full menu data (for printing, PDF generation, etc.)
+ */
+export const exportMenuData = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(id, 'name description priceRange menu');
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    // Process menu data for export
+    const processedMenu = restaurant.menu.map(category => {
+      const items = category.items.map(item => ({
+        name: item.name,
+        description: item.description || '',
+        price: item.price,
+        isVegetarian: item.isVegetarian || false,
+        isVegan: item.isVegan || false,
+        isGlutenFree: item.isGlutenFree || false,
+        allergens: item.allergens || [],
+        spicyLevel: item.spicyLevel || 0
+      }));
+
+      return {
+        name: category.name,
+        description: category.description || '',
+        items
+      };
+    });
+
+    const exportData = {
+      restaurantName: restaurant.name,
+      description: restaurant.description,
+      priceRange: restaurant.priceRange,
+      exportDate: new Date(),
+      menu: processedMenu
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: exportData
+    });
+  } catch (error : any) {
+    console.error('Error exporting menu data:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Get available menu items by category (optimized for POS ordering)
+ */
+export const getAvailableMenuByCategory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
+
+    const restaurant = await Restaurant.findById(id);
+
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    // Filter menu to only include available items within each category
+    const availableMenu = restaurant.menu.map(category => ({
+      id: category.id,
+      name: category.name,
+      items: category.items.filter(item => item.available !== false)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: availableMenu
+    });
+  } catch (error : any) {
+    console.error('Error fetching available menu:', error);
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+/**
+ * Batch update multiple menu items (e.g., mark items as unavailable)
+ */

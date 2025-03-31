@@ -49,25 +49,6 @@ interface OperatingHours {
   sunday?: DayHours;
 }
 
-// Interface for menu items
-interface MenuItem {
-  itemId: string;
-  name: string;
-  description?: string;
-  price: number;
-  category: DishCategory;
-  available: boolean;
-  image?: string;
-  ingredients?: string[];
-  allergens?: string[];
-  spicyLevel?: number; // 0-5 scale
-  vegetarian?: boolean;
-  vegan?: boolean;
-  glutenFree?: boolean;
-  preparationTime?: number; // in minutes
-  popular?: boolean;
-}
-
 // Interface for table
 interface Table {
   tableNumber: string;
@@ -78,15 +59,36 @@ interface Table {
   currentOrder?: Types.ObjectId;
 }
 
+// New interfaces for menu items and categories
+interface MenuItem {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  image?: string;
+  allergens?: string[];
+  isVegetarian?: boolean;
+  isVegan?: boolean;
+  isGlutenFree?: boolean;
+  spicyLevel?: number;
+  available?: boolean;
+  popular?: boolean;
+}
+
+interface MenuCategory {
+  id: string;
+  name: string;
+  description?: string;
+  items: MenuItem[];
+}
+
 // Main interface for the Restaurant document
 export interface IRestaurant extends Document {
   hotelId: Types.ObjectId;
   name: string;
   description: string;
-  cuisine: CuisineType[];
   priceRange: PriceRange;
   email?: string;
-  menuItems: MenuItem[];
   operatingHours: OperatingHours;
   reservationRequired: boolean;
   takeout: boolean;
@@ -97,17 +99,9 @@ export interface IRestaurant extends Document {
   images?: string[];
   established?: Date;
   tables: Table[];
+  menu: MenuCategory[]; // New field for menu
   createdAt: Date;
   updatedAt: Date;
-
-  // Instance methods
-  isOpen(date?: Date): boolean;
-  findItemById(itemId: Types.ObjectId | string): MenuItem | null;
-  getAvailableItems(): MenuItem[];
-  getItemsByCategory(category: DishCategory): MenuItem[];
-  getPopularItems(): MenuItem[];
-  getAvailableTables(): Table[];
-  findTableByNumber(tableNumber: string): Table | null;
 }
 
 // Regex for time format validation (HH:MM in 24-hour format)
@@ -185,19 +179,19 @@ const TableSchema = new Schema<Table>({
   }
 }, { _id: true });
 
-// Schema for menu items
+// Schema for menu item
 const MenuItemSchema = new Schema<MenuItem>({
-  itemId: {
+  id: {
     type: String,
-    required: [false, 'Item ID is required'],
-    // Custom itemId to allow the same dishes across different restaurants
+    required: [true, 'Menu item ID is required'],
+    trim: true
   },
   name: {
     type: String,
-    required: [true, 'Item name is required'],
+    required: [true, 'Menu item name is required'],
     trim: true,
-    minlength: [2, 'Item name must be at least 2 characters long'],
-    maxlength: [100, 'Item name cannot exceed 100 characters']
+    minlength: [2, 'Menu item name must be at least 2 characters long'],
+    maxlength: [100, 'Menu item name cannot exceed 100 characters']
   },
   description: {
     type: String,
@@ -209,44 +203,33 @@ const MenuItemSchema = new Schema<MenuItem>({
     required: [true, 'Price is required'],
     min: [0, 'Price cannot be negative']
   },
-  category: {
-    type: String,
-    enum: {
-      values: Object.values(DishCategory),
-      message: '{VALUE} is not a valid dish category'
-    },
-    required: [true, 'Dish category is required']
-  },
-  available: {
-    type: Boolean,
-    default: true
-  },
   image: {
     type: String,
-    trim: true,
     validate: {
-      validator: function(value: string) {
+      validator: function(url: string) {
         // Skip validation if not provided
-        if (!value) return true;
+        if (!url) return true;
         
-        // Basic URL validation for image
-        return /^(https?:\/\/|\/|\.\.\/|\.\/)[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+$/.test(value);
+        return /^(https?:\/\/|\/|\.\.\/|\.\/)[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=]+$/.test(url);
       },
-      message: 'Image must be a valid URL or path'
+      message: 'Image must have a valid URL or path'
     }
   },
-  ingredients: {
-    type: [String],
-    validate: {
-      validator: function(ingredients: string[]) {
-        // Ensure no duplicate ingredients
-        return new Set(ingredients).size === ingredients.length;
-      },
-      message: 'Duplicate ingredients are not allowed'
-    }
+  allergens: [{
+    type: String,
+    trim: true
+  }],
+  isVegetarian: {
+    type: Boolean,
+    default: false
   },
-  allergens: {
-    type: [String]
+  isVegan: {
+    type: Boolean,
+    default: false
+  },
+  isGlutenFree: {
+    type: Boolean,
+    default: false
   },
   spicyLevel: {
     type: Number,
@@ -254,27 +237,48 @@ const MenuItemSchema = new Schema<MenuItem>({
     max: 5,
     default: 0
   },
-  vegetarian: {
+  available: {
     type: Boolean,
-    default: false
-  },
-  vegan: {
-    type: Boolean,
-    default: false
-  },
-  glutenFree: {
-    type: Boolean,
-    default: false
-  },
-  preparationTime: {
-    type: Number,
-    min: 0
+    default: true
   },
   popular: {
     type: Boolean,
     default: false
   }
-}, { _id: true });
+}, { _id: false });
+
+// Schema for menu category
+const MenuCategorySchema = new Schema<MenuCategory>({
+  id: {
+    type: String,
+    required: [true, 'Category ID is required'],
+    trim: true
+  },
+  name: {
+    type: String,
+    required: [true, 'Category name is required'],
+    trim: true,
+    minlength: [2, 'Category name must be at least 2 characters long'],
+    maxlength: [50, 'Category name cannot exceed 50 characters']
+  },
+  description: {
+    type: String,
+    trim: true,
+    maxlength: [300, 'Description cannot exceed 300 characters']
+  },
+  items: {
+    type: [MenuItemSchema],
+    default: [],
+    validate: {
+      validator: function(items: MenuItem[]) {
+        // Ensure unique item IDs within a category
+        const itemIds = items.map(item => item.id);
+        return new Set(itemIds).size === itemIds.length;
+      },
+      message: 'Menu item IDs must be unique within a category'
+    }
+  }
+}, { _id: false });
 
 // Main Restaurant Schema
 const RestaurantSchema = new Schema<IRestaurant>({
@@ -296,22 +300,7 @@ const RestaurantSchema = new Schema<IRestaurant>({
     trim: true,
     maxlength: [1000, 'Description cannot exceed 1000 characters']
   },
-  cuisine: {
-    type: [{
-      type: String,
-      enum: {
-        values: Object.values(CuisineType),
-        message: '{VALUE} is not a valid cuisine type'
-      }
-    }],
-    required: [true, 'At least one cuisine type is required'],
-    validate: {
-      validator: function(cuisines: string[]) {
-        return cuisines.length > 0 && new Set(cuisines).size === cuisines.length;
-      },
-      message: 'At least one unique cuisine type is required'
-    }
-  },
+  
   priceRange: {
     type: String,
     enum: {
@@ -335,16 +324,7 @@ const RestaurantSchema = new Schema<IRestaurant>({
       message: props => `${props.value} is not a valid email address!`
     }
   },
-  menuItems: {
-    type: [MenuItemSchema],
-    default: [],
-    validate: {
-      validator: function(items: MenuItem[]) {
-        return items.length > 0;
-      },
-      message: 'Restaurant must have at least one menu item'
-    }
-  },
+
   operatingHours: {
     monday: { type: DayHoursSchema },
     tuesday: { type: DayHoursSchema },
@@ -411,6 +391,19 @@ const RestaurantSchema = new Schema<IRestaurant>({
       },
       message: 'Table numbers must be unique'
     }
+  },
+  // Add menu field to the schema
+  menu: {
+    type: [MenuCategorySchema],
+    default: [],
+    validate: {
+      validator: function(categories: MenuCategory[]) {
+        // Ensure unique category IDs
+        const categoryIds = categories.map(category => category.id);
+        return new Set(categoryIds).size === categoryIds.length;
+      },
+      message: 'Menu category IDs must be unique'
+    }
   }
 }, {
   timestamps: true,
@@ -423,35 +416,14 @@ const RestaurantSchema = new Schema<IRestaurant>({
   }
 });
 
-// Pre-save middleware to check for duplicate item IDs
-RestaurantSchema.pre('save', function(next) {
-  
-  if (!this.menuItems || this.menuItems.length === 0) {
-    return next();
-  }
-  
-  // Check for duplicate item IDs
-  const itemIds = this.menuItems.map(item => item.itemId.toString());
-  const uniqueItemIds = new Set(itemIds);
-  
-  if (itemIds.length !== uniqueItemIds.size) {
-    return next(new Error('Duplicate item IDs are not allowed in menu items'));
-  }
-  
-  next();
-});
-
 // Indexes for performance
 RestaurantSchema.index({ name: 1 });
 RestaurantSchema.index({ 'cuisine': 1 });
 RestaurantSchema.index({ 'location.city': 1, 'location.country': 1 });
 RestaurantSchema.index({ priceRange: 1 });
 RestaurantSchema.index({ averageRating: -1 });
-RestaurantSchema.index({ 'menuItems.itemId': 1 });
-RestaurantSchema.index({ 'menuItems.category': 1 });
-RestaurantSchema.index({ 'menuItems.vegetarian': 1 });
-RestaurantSchema.index({ 'menuItems.vegan': 1 });
-RestaurantSchema.index({ 'menuItems.glutenFree': 1 });
+RestaurantSchema.index({ 'menu.id': 1 }); // Index for menu categories
+RestaurantSchema.index({ 'menu.items.id': 1 }); // Index for menu items
 
 // Instance methods
 RestaurantSchema.methods.isOpen = function(date?: Date): boolean {
@@ -474,48 +446,6 @@ RestaurantSchema.methods.isOpen = function(date?: Date): boolean {
   return currentTimeStr >= hoursForDay.open && currentTimeStr < hoursForDay.close;
 };
 
-RestaurantSchema.methods.findItemById = function(itemId: Types.ObjectId | string): MenuItem | null {
-  const itemIdStr = itemId.toString();
-  return this.menuItems.find((item: any) => item.itemId.toString() === itemIdStr) || null;
-};
-
-RestaurantSchema.methods.getAvailableItems = function(): MenuItem[] {
-  return this.menuItems.filter((item: any) => item.available);
-};
-
-RestaurantSchema.methods.getItemsByCategory = function(category: DishCategory): MenuItem[] {
-  return this.menuItems.filter((item: any) => item.category === category);
-};
-
-RestaurantSchema.methods.getPopularItems = function(): MenuItem[] {
-  return this.menuItems.filter((item: any) => item.available && item.popular);
-};
-
-// Virtual properties
-RestaurantSchema.virtual('itemCount').get(function(this: IRestaurant) {
-  return this.menuItems.length;
-});
-
-RestaurantSchema.virtual('availableItemCount').get(function(this: IRestaurant) {
-  return this.menuItems.filter(item => item.available).length;
-});
-
-RestaurantSchema.virtual('categories').get(function(this: IRestaurant) {
-  return [...new Set(this.menuItems.map(item => item.category))];
-});
-
-RestaurantSchema.virtual('dietaryOptions').get(function(this: IRestaurant) {
-  const hasVegetarian = this.menuItems.some(item => item.vegetarian);
-  const hasVegan = this.menuItems.some(item => item.vegan);
-  const hasGlutenFree = this.menuItems.some(item => item.glutenFree);
-  
-  return {
-    vegetarian: hasVegetarian,
-    vegan: hasVegan,
-    glutenFree: hasGlutenFree
-  };
-});
-
 // Instance methods for table management
 RestaurantSchema.methods.getAvailableTables = function(): Table[] {
   return this.tables.filter((table: Table) => table.status === 'available');
@@ -525,6 +455,35 @@ RestaurantSchema.methods.findTableByNumber = function(tableNumber: string): Tabl
   return this.tables.find((table: Table) => table.tableNumber === tableNumber) || null;
 };
 
+// New methods for menu management
+RestaurantSchema.methods.findCategoryById = function(categoryId: string): MenuCategory | null {
+  return this.menu.find((category: MenuCategory) => category.id === categoryId) || null;
+};
+
+RestaurantSchema.methods.findItemById = function(itemId: string): MenuItem | null {
+  for (const category of this.menu) {
+    const item = category.items.find((item: MenuItem) => item.id === itemId);
+    if (item) return item;
+  }
+  return null;
+};
+
+RestaurantSchema.methods.getAvailableItems = function(): MenuItem[] {
+  const availableItems: MenuItem[] = [];
+  for (const category of this.menu) {
+    availableItems.push(...category.items.filter((item: MenuItem) => item.available));
+  }
+  return availableItems;
+};
+
+RestaurantSchema.methods.getPopularItems = function(): MenuItem[] {
+  const popularItems: MenuItem[] = [];
+  for (const category of this.menu) {
+    popularItems.push(...category.items.filter((item: MenuItem) => item.popular));
+  }
+  return popularItems;
+};
+
 // Create and export the model
 const Restaurant = mongoose.model<IRestaurant>('Restaurant', RestaurantSchema);
 
@@ -532,5 +491,7 @@ export {
   Restaurant, 
   CuisineType, 
   DishCategory,
-  PriceRange 
+  PriceRange,
+  MenuItem,
+  MenuCategory
 };

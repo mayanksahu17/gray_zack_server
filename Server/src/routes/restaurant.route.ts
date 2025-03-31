@@ -11,11 +11,11 @@ import { StaffRole } from '../models/staff.model';
 const router = express.Router();
 
 // Public routes
-router.get('/', restaurantController.getAllRestaurants);
+// router.get('/', restaurantController.getAllRestaurants);
 router.get('/:id', restaurantController.getRestaurantById);
-router.get('/:id/availability', restaurantController.checkRestaurantAvailability);
+// router.get('/:id/availability', restaurantController.checkRestaurantAvailability);
 router.get('/:id/menu', restaurantController.getRestaurantMenu);
-
+router.post('/:id/menu',restaurantController.addMenuCategory)
 // Protected routes - Hotel Admin only
 router.post(
   '/',
@@ -31,12 +31,12 @@ router.patch(
   restaurantController.updateRestaurant
 );
 
-router.delete(
-  '/:id',
-  verifyJWT,
-  authorizePermission([AdminRole.HOTEL_ADMIN]),
-  restaurantController.deleteRestaurant
-);
+// router.delete(
+//   '/:id',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.deleteRestaurant
+// );
 
 // Menu Customization Routes
 router.post(
@@ -47,42 +47,42 @@ router.post(
   restaurantController.addMenuItem
 );
 
-router.patch(
-  '/:id/menu-items/:itemId',
-  verifyJWT,
-  // authorizePermission([AdminRole.HOTEL_ADMIN]),
-  restaurantController.updateMenuItem
-);
+// router.patch(
+//   '/:id/menu-items/:itemId',
+//   verifyJWT,
+//   // authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.updateMenuItem
+// );
 
 // Table Management Routes
-router.post(
-  '/:id/tables',
-  verifyJWT,
-  // authorizePermission([AdminRole.HOTEL_ADMIN]),
-  restaurantController.addTable
-);
+// router.post(
+//   '/:id/tables',
+//   verifyJWT,
+//   // authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.addTable
+// );
 
 // Room Service Routes
-router.post(
-  '/:id/room-service',
-  verifyJWT,
-  authorizePermission([AdminRole.HOTEL_ADMIN]),
-  restaurantController.createRoomServiceOrder
-);
+// router.post(
+//   '/:id/room-service',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.createRoomServiceOrder
+// );
 
 // Mobile Ordering Routes
-router.get(
-  '/:id/qr-code',
-  verifyJWT,
-  authorizePermission([AdminRole.HOTEL_ADMIN]),
-  restaurantController.generateQRCode
-);
+// router.get(
+//   '/:id/qr-code',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.generateQRCode
+// );
 
-router.post(
-  '/:id/mobile-orders',
-  verifyJWT,
-  authorizePermission([AdminRole.HOTEL_ADMIN]),
-  restaurantController.createMobileOrder
-);
+// router.post(
+//   '/:id/mobile-orders',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.createMobileOrder
+// );
 
 export default router;

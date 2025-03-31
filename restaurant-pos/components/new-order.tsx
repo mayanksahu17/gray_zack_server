@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState , useEffect } from "react"
 import { Plus, Minus, Edit, Trash2, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -13,63 +13,57 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-// Sample menu data
-const menuCategories = [
-  {
-    id: "starters",
-    name: "Starters",
-    items: [
-      { id: "1", name: "Garlic Bread", price: 4.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "2", name: "Mozzarella Sticks", price: 6.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "3", name: "Bruschetta", price: 5.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "4", name: "Chicken Wings", price: 8.99, image: "/placeholder.svg?height=80&width=80" },
-    ],
-  },
-  {
-    id: "main",
-    name: "Main Course",
-    items: [
-      { id: "5", name: "Margherita Pizza", price: 12.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "6", name: "Chicken Burger", price: 10.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "7", name: "Pasta Carbonara", price: 13.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "8", name: "Grilled Salmon", price: 16.99, image: "/placeholder.svg?height=80&width=80" },
-    ],
-  },
-  {
-    id: "beverages",
-    name: "Beverages",
-    items: [
-      { id: "9", name: "Soft Drink", price: 2.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "10", name: "Iced Tea", price: 3.49, image: "/placeholder.svg?height=80&width=80" },
-      { id: "11", name: "Coffee", price: 3.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "12", name: "Fresh Juice", price: 4.99, image: "/placeholder.svg?height=80&width=80" },
-    ],
-  },
-  {
-    id: "desserts",
-    name: "Desserts",
-    items: [
-      { id: "13", name: "Chocolate Cake", price: 6.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "14", name: "Cheesecake", price: 7.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "15", name: "Ice Cream", price: 4.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "16", name: "Apple Pie", price: 5.99, image: "/placeholder.svg?height=80&width=80" },
-    ],
-  },
-  {
-    id: "sides",
-    name: "Sides",
-    items: [
-      { id: "17", name: "French Fries", price: 3.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "18", name: "Onion Rings", price: 4.49, image: "/placeholder.svg?height=80&width=80" },
-      { id: "19", name: "Side Salad", price: 4.99, image: "/placeholder.svg?height=80&width=80" },
-      { id: "20", name: "Coleslaw", price: 3.49, image: "/placeholder.svg?height=80&width=80" },
-    ],
-  },
-]
+  // Function to fetch restaurant data and return the menu
+// Async function to fetch restaurant data and return menu
+const getRestaurentData = async () => {
+  try {
+    const response = await fetch('http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu')
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log(data);
+    
+    if (data.success && data.data?.menu) {
+      return data.data.menu
+    } else {
+      throw new Error('Menu data not found in the response.')
+    }
+  } catch (error) {
+    console.error("Failed to fetch restaurant data:", error)
+    return []
+  }
+}
+async function addMenuToRestaurant(restaurantId : string, menuData : string) {
+  const url = `http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/menu`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(menuData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log("Menu added successfully:", result);
+    return result;
+  } catch (error) {
+    console.error("Error adding menu:", error);
+  }
+}
+
 
 export default function NewOrder({ onCheckout }: any) {
+  const [menuCategories, setMenuCategories] = useState<any[]>([])
+  const [activeCategory, setActiveCategory] = useState<string>("")
   const [cart, setCart] = useState([])
-  const [activeCategory, setActiveCategory] = useState(menuCategories[0].id)
   const [customizeItem, setCustomizeItem] = useState(null)
   const [customizations, setCustomizations] = useState({
     size: "medium",
@@ -78,23 +72,51 @@ export default function NewOrder({ onCheckout }: any) {
     specialInstructions: "",
     quantity: 1,
   })
+  const [showAddMenuDialog, setShowAddMenuDialog] = useState(false)
+  const [newMenu, setNewMenu] = useState({
+    id: '',
+    name: '',
+    description: '',
+    items: [
+      {
+        id: '',
+        name: '',
+        description: '',
+        price: 0,
+        isVegetarian: false,
+        spicyLevel: 0,
+      },
+    ],
+  })
   const [editingItemIndex, setEditingItemIndex] = useState(null)
   const [showPromoDialog, setShowPromoDialog] = useState(false)
   const [promoCode, setPromoCode] = useState("")
 
+    // Load menu data on component mount
+    useEffect(() => {
+      const fetchMenu = async () => {
+        const menu = await getRestaurentData()
+        setMenuCategories(menu)
+        if (menu.length > 0) {
+          setActiveCategory(menu[0].id)
+        }
+      }
+      fetchMenu()
+    }, [])
+
   // Calculate cart totals
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const subtotal = cart.reduce((sum : any, item : any) => sum + item.price * item.quantity, 0)
   const tax = subtotal * 0.08 // 8% tax
   const discount = promoCode ? subtotal * 0.1 : 0 // 10% discount if promo code applied
   const total = subtotal + tax - discount
 
   // Handle adding item to cart
-  const addToCart = (item) => {
+  const addToCart = (item : any) => {
     setCustomizeItem(item)
     setCustomizations({
       size: "medium",
       addons: [],
-      cookingPreference: "",
+      cookingPreference: "",  
       specialInstructions: "",
       quantity: 1,
     })
@@ -102,8 +124,8 @@ export default function NewOrder({ onCheckout }: any) {
   }
 
   // Handle editing cart item
-  const editCartItem = (index) => {
-    const item = cart[index]
+  const editCartItem = (index : any) => {
+    const item : any = cart[index]
     setCustomizeItem({
       ...item,
       addons: undefined,
@@ -122,22 +144,22 @@ export default function NewOrder({ onCheckout }: any) {
   }
 
   // Handle removing item from cart
-  const removeFromCart = (index) => {
+  const removeFromCart = (index : any) => {
     setCart(cart.filter((_, i) => i !== index))
   }
 
   // Handle updating item quantity in cart
-  const updateCartItemQuantity = (index, newQuantity) => {
+  const updateCartItemQuantity = (index  :any, newQuantity : any) => {
     if (newQuantity < 1) return
 
-    const updatedCart = [...cart]
+    const updatedCart : any = [...cart]
     updatedCart[index].quantity = newQuantity
     setCart(updatedCart)
   }
 
   // Handle confirming item customization
   const confirmCustomization = () => {
-    const customizedItem = {
+    const customizedItem  = {
       ...customizeItem,
       size: customizations.size,
       addons: customizations.addons,
@@ -148,7 +170,7 @@ export default function NewOrder({ onCheckout }: any) {
 
     if (editingItemIndex !== null) {
       // Update existing item
-      const updatedCart = [...cart]
+      const updatedCart : any = [...cart]
       updatedCart[editingItemIndex] = customizedItem
       setCart(updatedCart)
     } else {
@@ -167,7 +189,7 @@ export default function NewOrder({ onCheckout }: any) {
   }
 
   // Calculate addon price
-  const calculateAddonPrice = (addons) => {
+  const calculateAddonPrice = (addons : any) => {
     const addonPrices = {
       "Extra Cheese": 1.99,
       Bacon: 2.49,
@@ -175,11 +197,11 @@ export default function NewOrder({ onCheckout }: any) {
       Mushrooms: 1.49,
     }
 
-    return addons.reduce((sum, addon) => sum + (addonPrices[addon] || 0), 0)
+    return addons.reduce((sum : any, addon : any) => sum + (addonPrices[addon] || 0), 0)
   }
 
   // Calculate total item price including addons
-  const calculateItemTotal = (item) => {
+  const calculateItemTotal = (item : any) => {
     const basePrice = item.price
     const sizeMultiplier = item.size === "small" ? 0.8 : item.size === "large" ? 1.2 : 1
     const addonPrice = item.addons ? calculateAddonPrice(item.addons) : 0
@@ -191,6 +213,7 @@ export default function NewOrder({ onCheckout }: any) {
     <div className="flex h-full">
       {/* Left Panel - Menu Categories and Items */}
       <div className="w-3/5 border-r">
+      
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="h-full flex flex-col">
           <TabsList className="flex justify-start px-4 pt-4 pb-0 h-auto bg-transparent border-b rounded-none">
             {menuCategories.map((category) => (
@@ -202,13 +225,19 @@ export default function NewOrder({ onCheckout }: any) {
                 {category.name}
               </TabsTrigger>
             ))}
+            <Button
+            className="ml-4 mb-2 bg-green-600 text-white px-4 py-2 rounded-t-lg data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-b-transparent data-[state=active]:border data-[state=active]:border-blue-200 data-[state=active]:border-b-0 border-muted"
+            onClick={() => setShowAddMenuDialog(true)}
+          >
+            Add New Menu
+          </Button>
           </TabsList>
 
           {menuCategories.map((category) => (
             <TabsContent key={category.id} value={category.id} className="flex-1 p-4 m-0">
               <ScrollArea className="h-[calc(100vh-12rem)]">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {category.items.map((item) => (
+                  {category.items.map((item : any) => (
                     <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow border-blue-100">
                       <CardContent className="p-0">
                         <div className="aspect-video bg-blue-50 flex items-center justify-center">
@@ -242,8 +271,14 @@ export default function NewOrder({ onCheckout }: any) {
               </ScrollArea>
             </TabsContent>
           ))}
+
+
+          
         </Tabs>
+
+        
       </div>
+      
 
       {/* Right Panel - Cart */}
       <div className="w-2/5 flex flex-col h-full">
@@ -578,6 +613,120 @@ export default function NewOrder({ onCheckout }: any) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={showAddMenuDialog} onOpenChange={setShowAddMenuDialog}>
+  <DialogContent className="sm:max-w-[600px]">
+    <DialogHeader>
+      <DialogTitle>Add New Menu Category</DialogTitle>
+    </DialogHeader>
+
+    <div className="grid gap-4 py-4">
+      <Input
+        placeholder="Category ID"
+        value={newMenu.id}
+        onChange={(e) => setNewMenu({ ...newMenu, id: e.target.value })}
+      />
+      <Input
+        placeholder="Category Name"
+        value={newMenu.name}
+        onChange={(e) => setNewMenu({ ...newMenu, name: e.target.value })}
+      />
+      <Input
+        placeholder="Category Description"
+        value={newMenu.description}
+        onChange={(e) => setNewMenu({ ...newMenu, description: e.target.value })}
+      />
+
+      <Separator />
+      <h3 className="font-medium">Add Menu Item</h3>
+
+      <Input
+        placeholder="Item ID"
+        value={newMenu.items[0].id}
+        onChange={(e) =>
+          setNewMenu({
+            ...newMenu,
+            items: [{ ...newMenu.items[0], id: e.target.value }],
+          })
+        }
+      />
+      <Input
+        placeholder="Item Name"
+        value={newMenu.items[0].name}
+        onChange={(e) =>
+          setNewMenu({
+            ...newMenu,
+            items: [{ ...newMenu.items[0], name: e.target.value }],
+          })
+        }
+      />
+      <Input
+        placeholder="Item Description"
+        value={newMenu.items[0].description}
+        onChange={(e) =>
+          setNewMenu({
+            ...newMenu,
+            items: [{ ...newMenu.items[0], description: e.target.value }],
+          })
+        }
+      />
+      <Input
+        type="number"
+        placeholder="Price"
+        // value={newMenu.items[0].price}
+        onChange={(e) =>
+          setNewMenu({
+            ...newMenu,
+            items: [{ ...newMenu.items[0], price: parseFloat(e.target.value) }],
+          })
+        }
+      />
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          checked={newMenu.items[0].isVegetarian}
+          onCheckedChange={(val) =>
+            setNewMenu({
+              ...newMenu,
+              items: [{ ...newMenu.items[0], isVegetarian: val as boolean }],
+            })
+          }
+        />
+        <Label>Vegetarian</Label>
+      </div>
+      <Input
+        type="number"
+        placeholder="Spicy Level"
+        // value={newMenu.items[0].spicyLevel}
+        onChange={(e) =>
+          setNewMenu({
+            ...newMenu,
+            items: [{ ...newMenu.items[0], spicyLevel: parseInt(e.target.value) }],
+          })
+        }
+      />
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setShowAddMenuDialog(false)}>
+        Cancel
+      </Button>
+      <Button
+        onClick={async () => {
+          const restaurantId = "67e8f522404a64803d0cea8d"
+          const result = await addMenuToRestaurant(restaurantId, newMenu)
+          if (result?.success) {
+            setShowAddMenuDialog(false)
+            const updatedMenu = await getRestaurentData()
+            setMenuCategories(updatedMenu)
+            setActiveCategory(newMenu.id)
+          }
+        }}
+      >
+        Add Menu
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
     </div>
   )
 }
