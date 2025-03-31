@@ -54,6 +54,15 @@ router.patch(
   restaurantController.updateMenuItem
 );
 
+
+
+
+router.delete(
+  '/:restaurantId/menu-items/:categoryId/:itemId',
+  // verifyJWT,
+  // authorizePermission([AdminRole.HOTEL_ADMIN]),
+  restaurantController.deleteMenuItem
+);
 // Table Management Routes
 // router.post(
 //   '/:id/tables',
