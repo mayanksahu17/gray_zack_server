@@ -362,57 +362,63 @@ export const addMenuItem = async (req: Request, res: Response) => {
 /**
  * Update a menu item
 //  */
-// export const updateMenuItem = async (req: Request, res: Response) => {
-//   try {
-//     const { restaurantId, categoryId, itemId } = req.params;
-//     const updateData = req.body;
 
-//     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
-//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
-//     }
+export const updateMenuItem = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, categoryId, itemId } = req.params;
+    const updateData = req.body;
 
-//     const restaurant = await Restaurant.findById(restaurantId);
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
 
-//     if (!restaurant) {
-//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
-//     }
+    const restaurant = await Restaurant.findById(restaurantId);
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
 
-//     const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
-//     if (categoryIndex === -1) {
-//       return res.status(404).json({
-//         success: false,
-//         message: `Category with ID ${categoryId} not found`
-//       });
-//     }
+    const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+    if (categoryIndex === -1) {
+      return res.status(404).json({ success: false, message: `Category with ID ${categoryId} not found` });
+    }
 
-//     const itemIndex = restaurant.menu[categoryIndex].items.findIndex(i => i.id === itemId);
-//     if (itemIndex === -1) {
-//       return res.status(404).json({
-//         success: false,
-//         message: `Item with ID ${itemId} not found in this category`
-//       });
-//     }
+    const itemIndex = restaurant.menu[categoryIndex].items.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) {
+      return res.status(404).json({ success: false, message: `Item with ID ${itemId} not found in this category` });
+    }
 
-//     restaurant.menu[categoryIndex].items[itemIndex] = {
-//       ...restaurant.menu[categoryIndex].items[itemIndex].toObject(),
-//       ...updateData
-//     };
+    console.log('Original item:', restaurant.menu[categoryIndex].items[itemIndex]);
+    console.log('Update data received:', updateData);
 
-//     await restaurant.save();
+    // Remove categoryId from updateData as it's not a property of the menu item itself
+    // It's used for routing but shouldn't be saved in the item object
+    const { categoryId: receivedCategoryId, ...cleanUpdateData } = updateData;
 
-//     return res.status(200).json({
-//       success: true,
-//       data: restaurant.menu[categoryIndex].items[itemIndex],
-//       message: 'Menu item updated successfully'
-//     });
-//   } catch (error : any) {
-//     console.error('Error updating menu item:', error);
-//     if (error.name === 'ValidationError') {
-//       return res.status(400).json({ success: false, message: error.message });
-//     }
-//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
-//   }
-// };
+    // Update the item properties
+    restaurant.menu[categoryIndex].items[itemIndex] = {
+      ...restaurant.menu[categoryIndex].items[itemIndex],
+      ...cleanUpdateData,
+      id: itemId // Ensure ID remains unchanged
+    };
+
+    console.log('Updated item:', restaurant.menu[categoryIndex].items[itemIndex]);
+
+    // Save the updated restaurant document
+    await restaurant.save();
+
+    return res.status(200).json({ 
+      success: true, 
+      data: restaurant.menu[categoryIndex].items[itemIndex], 
+      message: 'Menu item updated successfully' 
+    });
+  } catch (error: any) {
+    console.error('Error updating menu item:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};  
 
 /**
  * Delete a menu item

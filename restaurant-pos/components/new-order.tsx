@@ -12,6 +12,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { log } from "node:console"
 
   // Function to fetch restaurant data and return the menu
 // Async function to fetch restaurant data and return menu
@@ -35,7 +43,7 @@ const getRestaurentData = async () => {
     return []
   }
 }
-async function addMenuToRestaurant(restaurantId : string, menuData : string) {
+async function addMenuToRestaurant(restaurantId: string, menuData: any) {
   const url = `http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/menu`;
 
   try {
@@ -88,9 +96,21 @@ export default function NewOrder({ onCheckout }: any) {
       },
     ],
   })
+  const [newMenuItem, setNewMenuItem] = useState({
+    id: '',
+    name: '',
+    description: '',
+    price: 0,
+    isVegetarian: false,
+    spicyLevel: 0,
+  })
+  const [selectedCategory, setSelectedCategory] = useState<string>("")
   const [editingItemIndex, setEditingItemIndex] = useState(null)
   const [showPromoDialog, setShowPromoDialog] = useState(false)
   const [promoCode, setPromoCode] = useState("")
+  const [showEditMenuDialog, setShowEditMenuDialog] = useState(false)
+  const [editingMenuItem, setEditingMenuItem] = useState<any>(null)
+  const [editingCategoryId, setEditingCategoryId] = useState<string>("")
 
     // Load menu data on component mount
     useEffect(() => {
@@ -209,6 +229,79 @@ export default function NewOrder({ onCheckout }: any) {
     return (basePrice * sizeMultiplier + addonPrice) * item.quantity
   }
 
+  const handleEditMenuItem = async (categoryId: string, item: any) => {
+    setEditingMenuItem(item)
+    setEditingCategoryId(categoryId)
+    setShowEditMenuDialog(true)
+  }
+
+  const handleDeleteMenuItem = async () => {
+    if (!editingMenuItem || !editingCategoryId) return
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingCategoryId}/${editingMenuItem.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to delete menu item')
+      }
+
+      const result = await response.json()
+      if (result.success) {
+        setShowEditMenuDialog(false)
+        const updatedMenu = await getRestaurentData()
+        setMenuCategories(updatedMenu)
+      }
+    } catch (error) {
+      console.error('Error deleting menu item:', error)
+    }
+  }
+
+  const handleUpdateMenuItem = async () => {
+    if (!editingMenuItem || !editingCategoryId) return
+
+    try {
+      console.log({
+        ...editingMenuItem,
+        categoryId: editingCategoryId
+      });
+      
+      const response = await fetch(
+        `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingMenuItem.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...editingMenuItem,
+            categoryId: editingCategoryId
+          })
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to update menu item')
+      }
+
+      const result = await response.json()
+      if (result.success) {
+        setShowEditMenuDialog(false)
+        const updatedMenu = await getRestaurentData()
+        setMenuCategories(updatedMenu)
+      }
+    } catch (error) {
+      console.error('Error updating menu item:', error)
+    }
+  }
+
   return (
     <div className="flex h-full">
       {/* Left Panel - Menu Categories and Items */}
@@ -253,15 +346,26 @@ export default function NewOrder({ onCheckout }: any) {
                               <h3 className="font-medium text-blue-900">{item.name}</h3>
                               <p className="text-sm text-blue-600">${item.price.toFixed(2)}</p>
                             </div>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                              onClick={() => addToCart(item)}
-                            >
-                              <Plus className="h-5 w-5" />
-                              <span className="sr-only">Add {item.name}</span>
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                onClick={() => handleEditMenuItem(category.id, item)}
+                              >
+                                <Edit className="h-5 w-5" />
+                                <span className="sr-only">Edit {item.name}</span>
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                onClick={() => addToCart(item)}
+                              >
+                                <Plus className="h-5 w-5" />
+                                <span className="sr-only">Add {item.name}</span>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -614,118 +718,355 @@ export default function NewOrder({ onCheckout }: any) {
         </DialogContent>
       </Dialog>
       <Dialog open={showAddMenuDialog} onOpenChange={setShowAddMenuDialog}>
-  <DialogContent className="sm:max-w-[600px]">
-    <DialogHeader>
-      <DialogTitle>Add New Menu Category</DialogTitle>
-    </DialogHeader>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add Menu Item</DialogTitle>
+          </DialogHeader>
 
-    <div className="grid gap-4 py-4">
-      <Input
-        placeholder="Category ID"
-        value={newMenu.id}
-        onChange={(e) => setNewMenu({ ...newMenu, id: e.target.value })}
-      />
-      <Input
-        placeholder="Category Name"
-        value={newMenu.name}
-        onChange={(e) => setNewMenu({ ...newMenu, name: e.target.value })}
-      />
-      <Input
-        placeholder="Category Description"
-        value={newMenu.description}
-        onChange={(e) => setNewMenu({ ...newMenu, description: e.target.value })}
-      />
+          <Tabs defaultValue="existing-category" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="existing-category">Add to Existing Category</TabsTrigger>
+              <TabsTrigger value="new-category">Create New Category</TabsTrigger>
+            </TabsList>
 
-      <Separator />
-      <h3 className="font-medium">Add Menu Item</h3>
+            <TabsContent value="existing-category" className="space-y-4">
+              <div className="space-y-2">
+                <Label>Select Category</Label>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {menuCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <Input
-        placeholder="Item ID"
-        value={newMenu.items[0].id}
-        onChange={(e) =>
-          setNewMenu({
-            ...newMenu,
-            items: [{ ...newMenu.items[0], id: e.target.value }],
-          })
-        }
-      />
-      <Input
-        placeholder="Item Name"
-        value={newMenu.items[0].name}
-        onChange={(e) =>
-          setNewMenu({
-            ...newMenu,
-            items: [{ ...newMenu.items[0], name: e.target.value }],
-          })
-        }
-      />
-      <Input
-        placeholder="Item Description"
-        value={newMenu.items[0].description}
-        onChange={(e) =>
-          setNewMenu({
-            ...newMenu,
-            items: [{ ...newMenu.items[0], description: e.target.value }],
-          })
-        }
-      />
-      <Input
-        type="number"
-        placeholder="Price"
-        // value={newMenu.items[0].price}
-        onChange={(e) =>
-          setNewMenu({
-            ...newMenu,
-            items: [{ ...newMenu.items[0], price: parseFloat(e.target.value) }],
-          })
-        }
-      />
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          checked={newMenu.items[0].isVegetarian}
-          onCheckedChange={(val) =>
-            setNewMenu({
-              ...newMenu,
-              items: [{ ...newMenu.items[0], isVegetarian: val as boolean }],
-            })
-          }
-        />
-        <Label>Vegetarian</Label>
-      </div>
-      <Input
-        type="number"
-        placeholder="Spicy Level"
-        // value={newMenu.items[0].spicyLevel}
-        onChange={(e) =>
-          setNewMenu({
-            ...newMenu,
-            items: [{ ...newMenu.items[0], spicyLevel: parseInt(e.target.value) }],
-          })
-        }
-      />
-    </div>
+              <Separator />
 
-    <DialogFooter>
-      <Button variant="outline" onClick={() => setShowAddMenuDialog(false)}>
-        Cancel
-      </Button>
-      <Button
-        onClick={async () => {
-          const restaurantId = "67e8f522404a64803d0cea8d"
-          const result = await addMenuToRestaurant(restaurantId, newMenu)
-          if (result?.success) {
-            setShowAddMenuDialog(false)
-            const updatedMenu = await getRestaurentData()
-            setMenuCategories(updatedMenu)
-            setActiveCategory(newMenu.id)
-          }
-        }}
-      >
-        Add Menu
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+              <div className="space-y-2">
+                <Label>Item ID</Label>
+                <Input
+                  placeholder="Item ID"
+                  value={newMenuItem.id}
+                  onChange={(e) => setNewMenuItem({ ...newMenuItem, id: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Item Name</Label>
+                <Input
+                  placeholder="Item Name"
+                  value={newMenuItem.name}
+                  onChange={(e) => setNewMenuItem({ ...newMenuItem, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Item Description</Label>
+                <Input
+                  placeholder="Item Description"
+                  value={newMenuItem.description}
+                  onChange={(e) => setNewMenuItem({ ...newMenuItem, description: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input
+                  type="number"
+                  placeholder="Price"
+                  onChange={(e) => setNewMenuItem({ ...newMenuItem, price: parseFloat(e.target.value) })}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  checked={newMenuItem.isVegetarian}
+                  onCheckedChange={(val) => setNewMenuItem({ ...newMenuItem, isVegetarian: val as boolean })}
+                />
+                <Label>Vegetarian</Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Spicy Level (0-5)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="5"
+                  placeholder="Spicy Level"
+                  onChange={(e) => setNewMenuItem({ ...newMenuItem, spicyLevel: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddMenuDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!selectedCategory) {
+                      alert("Please select a category");
+                      return;
+                    }
+                    const restaurantId = "67e8f522404a64803d0cea8d";
+                    const result = await addMenuToRestaurant(restaurantId, {
+                      id: selectedCategory,
+                      items: [newMenuItem]
+                    });
+                    if (result?.success) {
+                      setShowAddMenuDialog(false);
+                      const updatedMenu = await getRestaurentData();
+                      setMenuCategories(updatedMenu);
+                      setNewMenuItem({
+                        id: '',
+                        name: '',
+                        description: '',
+                        price: 0,
+                        isVegetarian: false,
+                        spicyLevel: 0,
+                      });
+                    }
+                  }}
+                >
+                  Add Item
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+
+            <TabsContent value="new-category" className="space-y-4">
+              <div className="space-y-2">
+                <Label>Category ID</Label>
+                <Input
+                  placeholder="Category ID"
+                  value={newMenu.id}
+                  onChange={(e) => setNewMenu({ ...newMenu, id: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Category Name</Label>
+                <Input
+                  placeholder="Category Name"
+                  value={newMenu.name}
+                  onChange={(e) => setNewMenu({ ...newMenu, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Category Description</Label>
+                <Input
+                  placeholder="Category Description"
+                  value={newMenu.description}
+                  onChange={(e) => setNewMenu({ ...newMenu, description: e.target.value })}
+                />
+              </div>
+
+              <Separator />
+              <h3 className="font-medium">Add Menu Item</h3>
+
+              <div className="space-y-2">
+                <Label>Item ID</Label>
+                <Input
+                  placeholder="Item ID"
+                  value={newMenu.items[0].id}
+                  onChange={(e) =>
+                    setNewMenu({
+                      ...newMenu,
+                      items: [{ ...newMenu.items[0], id: e.target.value }],
+                    })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Item Name</Label>
+                <Input
+                  placeholder="Item Name"
+                  value={newMenu.items[0].name}
+                  onChange={(e) =>
+                    setNewMenu({
+                      ...newMenu,
+                      items: [{ ...newMenu.items[0], name: e.target.value }],
+                    })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Item Description</Label>
+                <Input
+                  placeholder="Item Description"
+                  value={newMenu.items[0].description}
+                  onChange={(e) =>
+                    setNewMenu({
+                      ...newMenu,
+                      items: [{ ...newMenu.items[0], description: e.target.value }],
+                    })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input
+                  type="number"
+                  placeholder="Price"
+                  onChange={(e) =>
+                    setNewMenu({
+                      ...newMenu,
+                      items: [{ ...newMenu.items[0], price: parseFloat(e.target.value) }],
+                    })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  checked={newMenu.items[0].isVegetarian}
+                  onCheckedChange={(val) =>
+                    setNewMenu({
+                      ...newMenu,
+                      items: [{ ...newMenu.items[0], isVegetarian: val as boolean }],
+                    })
+                  }
+                />
+                <Label>Vegetarian</Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Spicy Level (0-5)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="5"
+                  placeholder="Spicy Level"
+                  onChange={(e) =>
+                    setNewMenu({
+                      ...newMenu,
+                      items: [{ ...newMenu.items[0], spicyLevel: parseInt(e.target.value) }],
+                    })
+                  }
+                />
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddMenuDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const restaurantId = "67e8f522404a64803d0cea8d";
+                    const result = await addMenuToRestaurant(restaurantId, newMenu);
+                    if (result?.success) {
+                      setShowAddMenuDialog(false);
+                      const updatedMenu = await getRestaurentData();
+                      setMenuCategories(updatedMenu);
+                      setNewMenu({
+                        id: '',
+                        name: '',
+                        description: '',
+                        items: [
+                          {
+                            id: '',
+                            name: '',
+                            description: '',
+                            price: 0,
+                            isVegetarian: false,
+                            spicyLevel: 0,
+                          },
+                        ],
+                      });
+                    }
+                  }}
+                >
+                  Add Category
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Menu Item Dialog */}
+      <Dialog open={showEditMenuDialog} onOpenChange={setShowEditMenuDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Menu Item</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Item Name</Label>
+              <Input
+                value={editingMenuItem?.name || ''}
+                onChange={(e) => setEditingMenuItem({ ...editingMenuItem, name: e.target.value })}
+                placeholder="Item Name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                value={editingMenuItem?.description || ''}
+                onChange={(e) => setEditingMenuItem({ ...editingMenuItem, description: e.target.value })}
+                placeholder="Item Description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Price</Label>
+              <Input
+                type="number"
+                value={editingMenuItem?.price || 0}
+                onChange={(e) => setEditingMenuItem({ ...editingMenuItem, price: parseFloat(e.target.value) })}
+                placeholder="Price"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                checked={editingMenuItem?.isVegetarian || false}
+                onCheckedChange={(val) => setEditingMenuItem({ ...editingMenuItem, isVegetarian: val as boolean })}
+              />
+              <Label>Vegetarian</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Spicy Level (0-5)</Label>
+              <Input
+                type="number"
+                min="0"
+                max="5"
+                value={editingMenuItem?.spicyLevel || 0}
+                onChange={(e) => setEditingMenuItem({ ...editingMenuItem, spicyLevel: parseInt(e.target.value) })}
+                placeholder="Spicy Level"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <Button variant="destructive" onClick={handleDeleteMenuItem}>
+              Delete Item
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowEditMenuDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateMenuItem}>
+                Save Changes
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

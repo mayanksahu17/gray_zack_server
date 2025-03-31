@@ -47,12 +47,12 @@ router.post(
   restaurantController.addMenuItem
 );
 
-// router.patch(
-//   '/:id/menu-items/:itemId',
-//   verifyJWT,
-//   // authorizePermission([AdminRole.HOTEL_ADMIN]),
-//   restaurantController.updateMenuItem
-// );
+router.patch(
+  '/:id/menu-items/:itemId',
+  verifyJWT,
+  // authorizePermission([AdminRole.HOTEL_ADMIN]),
+  restaurantController.updateMenuItem
+);
 
 // Table Management Routes
 // router.post(
