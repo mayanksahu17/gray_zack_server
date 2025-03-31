@@ -48,8 +48,8 @@ router.post(
 );
 
 router.patch(
-  '/:id/menu-items/:itemId',
-  verifyJWT,
+  '/:restaurantId/menu-items/:itemId',
+  // verifyJWT,
   // authorizePermission([AdminRole.HOTEL_ADMIN]),
   restaurantController.updateMenuItem
 );

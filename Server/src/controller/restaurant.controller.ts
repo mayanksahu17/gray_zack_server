@@ -365,21 +365,27 @@ export const addMenuItem = async (req: Request, res: Response) => {
 
 export const updateMenuItem = async (req: Request, res: Response) => {
   try {
-    const { restaurantId, categoryId, itemId } = req.params;
+    const { restaurantId, itemId } = req.params;
     const updateData = req.body;
-
+    console.log(restaurantId);
+    
     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
     }
 
-    const restaurant = await Restaurant.findById(restaurantId);
+    const restaurant = await Restaurant.findById( restaurantId);
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const categoryIndex = restaurant.menu.findIndex(c => c.id === categoryId);
+    const categoryIndex = restaurant.menu.findIndex((c) => {
+      console.log(c.id);
+      if(c.id === updateData.categoryId) {
+        console.log("found");
+      return c.id;
+    }} );
     if (categoryIndex === -1) {
-      return res.status(404).json({ success: false, message: `Category with ID ${categoryId} not found` });
+      return res.status(404).json({ success: false, message: `Category with ID ${updateData.categoryId} not found` });
     }
 
     const itemIndex = restaurant.menu[categoryIndex].items.findIndex(i => i.id === itemId);
