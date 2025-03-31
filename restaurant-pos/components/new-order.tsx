@@ -82,12 +82,10 @@ export default function NewOrder({ onCheckout }: any) {
   })
   const [showAddMenuDialog, setShowAddMenuDialog] = useState(false)
   const [newMenu, setNewMenu] = useState({
-    id: '',
     name: '',
     description: '',
     items: [
       {
-        id: '',
         name: '',
         description: '',
         price: 0,
@@ -97,7 +95,6 @@ export default function NewOrder({ onCheckout }: any) {
     ],
   })
   const [newMenuItem, setNewMenuItem] = useState({
-    id: '',
     name: '',
     description: '',
     price: 0,
@@ -752,15 +749,6 @@ export default function NewOrder({ onCheckout }: any) {
               <Separator />
 
               <div className="space-y-2">
-                <Label>Item ID</Label>
-                <Input
-                  placeholder="Item ID"
-                  value={newMenuItem.id}
-                  onChange={(e) => setNewMenuItem({ ...newMenuItem, id: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label>Item Name</Label>
                 <Input
                   placeholder="Item Name"
@@ -826,7 +814,6 @@ export default function NewOrder({ onCheckout }: any) {
                       const updatedMenu = await getRestaurentData();
                       setMenuCategories(updatedMenu);
                       setNewMenuItem({
-                        id: '',
                         name: '',
                         description: '',
                         price: 0,
@@ -842,15 +829,6 @@ export default function NewOrder({ onCheckout }: any) {
             </TabsContent>
 
             <TabsContent value="new-category" className="space-y-4">
-              <div className="space-y-2">
-                <Label>Category ID</Label>
-                <Input
-                  placeholder="Category ID"
-                  value={newMenu.id}
-                  onChange={(e) => setNewMenu({ ...newMenu, id: e.target.value })}
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label>Category Name</Label>
                 <Input
@@ -871,20 +849,6 @@ export default function NewOrder({ onCheckout }: any) {
 
               <Separator />
               <h3 className="font-medium">Add Menu Item</h3>
-
-              <div className="space-y-2">
-                <Label>Item ID</Label>
-                <Input
-                  placeholder="Item ID"
-                  value={newMenu.items[0].id}
-                  onChange={(e) =>
-                    setNewMenu({
-                      ...newMenu,
-                      items: [{ ...newMenu.items[0], id: e.target.value }],
-                    })
-                  }
-                />
-              </div>
 
               <div className="space-y-2">
                 <Label>Item Name</Label>
@@ -970,12 +934,10 @@ export default function NewOrder({ onCheckout }: any) {
                       const updatedMenu = await getRestaurentData();
                       setMenuCategories(updatedMenu);
                       setNewMenu({
-                        id: '',
                         name: '',
                         description: '',
                         items: [
                           {
-                            id: '',
                             name: '',
                             description: '',
                             price: 0,
