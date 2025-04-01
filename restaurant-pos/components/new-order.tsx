@@ -82,12 +82,10 @@ export default function NewOrder({ onCheckout }: any) {
   })
   const [showAddMenuDialog, setShowAddMenuDialog] = useState(false)
   const [newMenu, setNewMenu] = useState({
-    id: '',
     name: '',
     description: '',
     items: [
       {
-        id: '',
         name: '',
         description: '',
         price: 0,
@@ -752,15 +750,6 @@ export default function NewOrder({ onCheckout }: any) {
               <Separator />
 
               <div className="space-y-2">
-                <Label>Item ID</Label>
-                <Input
-                  placeholder="Item ID"
-                  value={newMenuItem.id}
-                  onChange={(e) => setNewMenuItem({ ...newMenuItem, id: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label>Item Name</Label>
                 <Input
                   placeholder="Item Name"
@@ -826,7 +815,6 @@ export default function NewOrder({ onCheckout }: any) {
                       const updatedMenu = await getRestaurentData();
                       setMenuCategories(updatedMenu);
                       setNewMenuItem({
-                        id: '',
                         name: '',
                         description: '',
                         price: 0,
@@ -970,12 +958,10 @@ export default function NewOrder({ onCheckout }: any) {
                       const updatedMenu = await getRestaurentData();
                       setMenuCategories(updatedMenu);
                       setNewMenu({
-                        id: '',
                         name: '',
                         description: '',
                         items: [
                           {
-                            id: '',
                             name: '',
                             description: '',
                             price: 0,
