@@ -579,60 +579,60 @@ export const addRestaurantTable = async (req: Request, res: Response) => {
 /**
  * Update a table's information
  */
-// export const updateRestaurantTable = async (req: Request, res: Response) => {
-//   try {
-//     const { restaurantId, tableNumber } = req.params;
-//     const updateData = req.body;
+export const updateRestaurantTable = async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, tableNumber } = req.params;
+    const updateData = req.body;
 
-//     if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
-//       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
-//     }
+    if (!mongoose.Types.ObjectId.isValid(restaurantId)) {
+      return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' });
+    }
 
-//     const restaurant = await Restaurant.findById(restaurantId);
+    const restaurant = await Restaurant.findById(restaurantId);
 
-//     if (!restaurant) {
-//       return res.status(404).json({ success: false, message: 'Restaurant not found' });
-//     }
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
 
-//     const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
-//     if (tableIndex === -1) {
-//       return res.status(404).json({
-//         success: false,
-//         message: `Table with number ${tableNumber} not found`
-//       });
-//     }
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableNumber);
+    if (tableIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: `Table with number ${tableNumber} not found`
+      });
+    }
 
-//     // If tableNumber is being updated, ensure it doesn't conflict with existing tables
-//     if (updateData.tableNumber && updateData.tableNumber !== tableNumber) {
-//       const existingTable = restaurant.tables.find(t => t.tableNumber === updateData.tableNumber);
-//       if (existingTable) {
-//         return res.status(400).json({
-//           success: false,
-//           message: `Table with number ${updateData.tableNumber} already exists`
-//         });
-//       }
-//     }
+    // If tableNumber is being updated, ensure it doesn't conflict with existing tables
+    if (updateData.tableNumber && updateData.tableNumber !== tableNumber) {
+      const existingTable = restaurant.tables.find(t => t.tableNumber === updateData.tableNumber);
+      if (existingTable) {
+        return res.status(400).json({
+          success: false,
+          message: `Table with number ${updateData.tableNumber} already exists`
+        });
+      }
+    }
 
-//     restaurant.tables[tableIndex] = {
-//       ...restaurant.tables[tableIndex].toObject(),
-//       ...updateData
-//     };
+    restaurant.tables[tableIndex] = {
+      ...restaurant.tables[tableIndex],
+      ...updateData
+    };
 
-//     await restaurant.save();
+    await restaurant.save();
 
-//     return res.status(200).json({
-//       success: true,
-//       data: restaurant.tables[tableIndex],
-//       message: 'Table updated successfully'
-//     });
-//   } catch (error : any) {
-//     console.error('Error updating table:', error);
-//     if (error.name === 'ValidationError') {
-//       return res.status(400).json({ success: false, message: error.message });
-//     }
-//     return res.status(500).json({ success: false, message: 'Server error', error: error.message });
-//   }
-// };
+    return res.status(200).json({
+      success: true,
+      data: restaurant.tables[tableIndex],
+      message: 'Table updated successfully'
+    });
+  } catch (error : any) {
+    console.error('Error updating table:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
 
 /**
  * Delete a table

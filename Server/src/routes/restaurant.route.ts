@@ -64,12 +64,12 @@ router.delete(
   restaurantController.deleteMenuItem
 );
 // Table Management Routes
-// router.post(
-//   '/:id/tables',
-//   verifyJWT,
-//   // authorizePermission([AdminRole.HOTEL_ADMIN]),
-//   restaurantController.addTable
-// );
+router.post(
+  '/:id/tables',
+  // verifyJWT,
+  // authorizePermission([AdminRole.HOTEL_ADMIN]),
+  restaurantController.addRestaurantTable
+).get("/:id/tables",restaurantController.getRestaurantTables)
 
 // Room Service Routes
 // router.post(

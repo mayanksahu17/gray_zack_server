@@ -12,8 +12,10 @@ import Inventory from "@/components/inventory"
 import Reports from "@/components/reports"
 import OrderHistory from "@/components/order-history"
 import Checkout from "@/components/checkout"
+import RestaurantTables from "@/components/tables"
 import NewOrder from "@/components/new-order"
 import AuthUtils from "@/utills/authUtills"
+
 
 export default function RestaurantPOS() {
   const router = useRouter()
@@ -129,6 +131,16 @@ export default function RestaurantPOS() {
             <Settings size={24} />
             <span className="sr-only">Settings</span>
           </Button>
+
+          <Button
+            variant={currentScreen === "tables" ? "secondary" : "ghost"}
+            size="icon"
+            className={`w-12 h-12 rounded-full ${currentScreen === "tables" ? "bg-blue-100 text-blue-700" : "text-white hover:bg-blue-700/50"}`}
+            onClick={() => navigateTo("tables")}
+          >
+            <Settings size={24} />
+            <span className="sr-only">Tables</span>
+          </Button>
         </nav>
 
         <Button
@@ -154,6 +166,7 @@ export default function RestaurantPOS() {
               {currentScreen === "inventory" && "Inventory Management"}
               {currentScreen === "reports" && "Reports & Analytics"}
               {currentScreen === "settings" && "Settings"}
+              {currentScreen === "tables" && "tables"}
             </h1>
           </div>
 
@@ -186,6 +199,7 @@ export default function RestaurantPOS() {
           {currentScreen === "inventory" && <Inventory />}
           {currentScreen === "reports" && <Reports />}
           {currentScreen === "settings" && <SettingsPage />}
+          {currentScreen === "tables" && < RestaurantTables/>}
         </main>
       </div>
     </div>

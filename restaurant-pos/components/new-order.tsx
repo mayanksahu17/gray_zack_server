@@ -1,5 +1,4 @@
 "use client"
-
 import { useState , useEffect } from "react"
 import { Plus, Minus, Edit, Trash2, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { v4 as uuidv4 } from 'uuid';
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
@@ -37,7 +37,7 @@ const getRestaurentData = async () => {
       return data.data.menu
     } else {
       throw new Error('Menu data not found in the response.')
-    }
+    } 
   } catch (error) {
     console.error("Failed to fetch restaurant data:", error)
     return []
@@ -97,7 +97,7 @@ export default function NewOrder({ onCheckout }: any) {
     ],
   })
   const [newMenuItem, setNewMenuItem] = useState({
-    id: '',
+    id: uuidv4(),
     name: '',
     description: '',
     price: 0,
@@ -818,7 +818,7 @@ export default function NewOrder({ onCheckout }: any) {
                     }
                     const restaurantId = "67e8f522404a64803d0cea8d";
                     const result = await addMenuToRestaurant(restaurantId, {
-                      id: selectedCategory,
+                      id:  uuidv4(),
                       items: [newMenuItem]
                     });
                     if (result?.success) {
@@ -842,14 +842,14 @@ export default function NewOrder({ onCheckout }: any) {
             </TabsContent>
 
             <TabsContent value="new-category" className="space-y-4">
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label>Category ID</Label>
                 <Input
                   placeholder="Category ID"
                   value={newMenu.id}
                   onChange={(e) => setNewMenu({ ...newMenu, id: e.target.value })}
                 />
-              </div>
+              </div> */}
 
               <div className="space-y-2">
                 <Label>Category Name</Label>
@@ -872,7 +872,7 @@ export default function NewOrder({ onCheckout }: any) {
               <Separator />
               <h3 className="font-medium">Add Menu Item</h3>
 
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label>Item ID</Label>
                 <Input
                   placeholder="Item ID"
@@ -884,7 +884,7 @@ export default function NewOrder({ onCheckout }: any) {
                     })
                   }
                 />
-              </div>
+              </div> */}
 
               <div className="space-y-2">
                 <Label>Item Name</Label>
