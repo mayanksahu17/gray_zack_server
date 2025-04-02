@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Restaurant, MenuItem,  } from '../models/restaurant.model';
-
+import { v4 as uuidv4 } from 'uuid';
 // ==========================================
 // Restaurant Information Controllers
 // ==========================================
@@ -157,6 +157,7 @@ export const addMenuCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const categoryData = req.body
+    const categoryId = categoryData?.id
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: 'Invalid restaurant ID format' })
@@ -964,6 +965,369 @@ export const getAvailableMenuByCategory = async (req: Request, res: Response) =>
   }
 };
 
+
+
 /**
  * Batch update multiple menu items (e.g., mark items as unavailable)
  */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Process payment for an order
+ * @route POST /api/v1/payments/process
+ * @access Public
+ */
+
+
+export const processPayment = async (req: Request, res: Response) => {
+
+try {
+  const { amount, currency, paymentMethod, cardDetails } = req.body;
+
+  // Validate required fields
+  if (!amount || !currency || !paymentMethod) {
+    return res.status(400).json({
+      success: false,
+      message: 'Amount, currency, and payment method are required',
+    });
+  }
+
+  // Validate payment method
+  const validPaymentMethods = ['cash', 'card', 'wallet', 'qr'];
+  if (!validPaymentMethods.includes(paymentMethod)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid payment method',
+    });
+  }
+
+  // Validate card details if payment method is card
+  if (paymentMethod === 'card') {
+    if (!cardDetails || !cardDetails.cardNumber || !cardDetails.expiryDate || !cardDetails.cvv) {
+      return res.status(400).json({
+        success: false,
+        message: 'Card details are required for card payment',
+      });
+    }
+    
+    // Basic card validation
+    if (cardDetails.cardNumber.replace(/\s/g, '').length < 14) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid card number',
+      });
+    }
+  }
+
+  // In a real application, you would integrate with a payment gateway like Stripe or PayPal here
+  // For this dummy implementation, we'll simulate a payment response
+
+  // Generate unique IDs for the transaction
+  const paymentId = uuidv4();
+  const transactionId = `TXN-${Date.now()}`;
+  
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Create a payment record in the database (pseudocode)
+  // const payment = await Payment.create({
+  //   paymentId,
+  //   transactionId,
+  //   amount,
+  //   currency,
+  //   paymentMethod,
+  //   status: 'completed',
+  //   timestamp: new Date(),
+  // });
+
+  // Return success response with payment details
+  return res.status(200).json({
+    success: true,
+    message: 'Payment processed successfully',
+    data: {
+      paymentId,
+      transactionId,
+      amount,
+      currency,
+      status: 'completed',
+      timestamp: new Date().toISOString(),
+    },
+  });
+} catch (error : any) {
+  console.error('Payment processing error:', error);
+  return res.status(500).json({
+    success: false,
+    message: 'An error occurred while processing the payment',
+    error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+  });
+}
+
+};
+
+
+
+
+/**
+ * Get payment details
+ * @route GET /api/v1/payments/:paymentId
+ * @access Private
+ */
+const getPaymentDetails =  async (req: Request, res: Response) => {
+  try {
+    const { paymentId } = req.params;
+    
+    // In a real application, you would fetch the payment from your database
+    // For this dummy implementation, we'll return a not found error
+    
+    return res.status(404).json({
+      success: false,
+      message: 'Payment not found',
+    });
+    
+    // If found, you would return the payment details
+    // return res.status(200).json({
+    //   success: true,
+    //   data: payment,
+    // });
+  } catch (error : any) {
+    console.error('Error fetching payment:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching the payment',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+
+
+
+
+/**
+ * Create a new order
+ * @route POST /api/v1/orders
+ * @access Public
+ */
+export const createOrder = async  (req: Request, res: Response) => {
+  try {
+    const { 
+      items,
+      subtotal,
+      tax,
+      discount,
+      total,
+      diningOption,
+      tableNumber,
+      paymentMethod,
+      customerDetails,
+      orderNumber,
+      timestamp,
+      paymentId,
+      paymentStatus,
+      transactionId
+    } = req.body;
+
+    // Validate required fields
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order must contain at least one item',
+      });
+    }
+
+    if (!subtotal || !total || !diningOption || !paymentMethod) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required order details',
+      });
+    }
+
+    // Validate dining option
+    if (diningOption === 'dine-in' && !tableNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Table number is required for dine-in orders',
+      });
+    }
+
+    // Validate customer details for delivery
+    if (diningOption === 'delivery') {
+      if (!customerDetails || !customerDetails.name || !customerDetails.phone || !customerDetails.address) {
+        return res.status(400).json({
+          success: false,
+          message: 'Customer details are required for delivery orders',
+        });
+      }
+    }
+
+    // Validate payment information
+    if (!paymentId || !paymentStatus || !transactionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment information is required',
+      });
+    }
+
+    // Generate a unique order ID
+    const orderId = `ORDER-${Date.now()}`;
+    
+    // In a real application, you would create an order in your database
+    // For this implementation, we'll simulate order creation
+    
+    // Create order record (pseudocode)
+    // const order = await Order.create({
+    //   orderId,
+    //   items,
+    //   subtotal,
+    //   tax,
+    //   discount,
+    //   total,
+    //   diningOption,
+    //   tableNumber,
+    //   paymentMethod,
+    //   customerDetails,
+    //   orderNumber,
+    //   paymentId,
+    //   paymentStatus,
+    //   transactionId,
+    //   status: 'received',
+    //   createdAt: new Date(),
+    // });
+
+    // If dine-in, update table status (pseudocode)
+    // if (diningOption === 'dine-in') {
+    //   await Table.findOneAndUpdate(
+    //     { tableNumber },
+    //     { status: 'occupied', currentOrderId: orderId }
+    //   );
+    // }
+
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Return success response with order details
+    return res.status(201).json({
+      success: true,
+      message: 'Order created successfully',
+      data: {
+        orderId,
+        orderNumber,
+        status: 'received',
+        timestamp: new Date().toISOString(),
+        estimatedReadyTime: new Date(Date.now() + 20 * 60000).toISOString(), // 20 minutes from now
+      },
+    });
+  } catch (error :any ) {
+    console.error('Order creation error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while creating the order',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * Get all orders
+ * @route GET /api/v1/orders
+ * @access Private
+ */
+export const getOrders = async  (req: Request, res: Response) => {
+  try {
+    // In a real application, you would fetch orders from your database
+    // For this implementation, we'll return an empty array
+    
+    return res.status(200).json({
+      success: true,
+      data: [],
+    });
+  } catch (error : any) {
+    console.error('Error fetching orders:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching orders',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * Get order by ID
+ * @route GET /api/v1/orders/:orderId
+ * @access Private
+ */
+export const getOrderById = async  (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    
+    // In a real application, you would fetch the order from your database
+    // For this implementation, we'll return a not found error
+    
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found',
+    });
+  } catch (error: any) {
+    console.error('Error fetching order:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching the order',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+/**
+ * Update order status
+ * @route PATCH /api/v1/orders/:orderId/status
+ * @access Private
+ */
+export const updateOrderStatus = async  (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required',
+      });
+    }
+    
+    // Validate status
+    const validStatuses = ['received', 'preparing', 'ready', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order status',
+      });
+    }
+    
+    // In a real application, you would update the order in your database
+    // For this implementation, we'll return a not found error
+    
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found',
+    });
+  } catch (error : any) {
+    console.error('Error updating order status:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while updating order status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};

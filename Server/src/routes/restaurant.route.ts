@@ -23,6 +23,18 @@ router.post(
   authorizePermission([AdminRole.HOTEL_ADMIN] ),
   restaurantController.createRestaurant
 );
+router.post(
+  '/orders',
+  // verifyJWT,
+  restaurantController.createOrder
+);
+
+
+router.post(
+  '/payments/process',
+  // verifyJWT,
+  restaurantController.processPayment
+);
 
 router.patch(
   '/:id',
@@ -30,6 +42,8 @@ router.patch(
   authorizePermission([AdminRole.HOTEL_ADMIN]),
   restaurantController.updateRestaurant
 );
+
+
 
 // router.delete(
 //   '/:id',
