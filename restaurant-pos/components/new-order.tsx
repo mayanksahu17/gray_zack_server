@@ -95,7 +95,7 @@ export default function NewOrder({ onCheckout }: any) {
     ],
   })
   const [newMenuItem, setNewMenuItem] = useState({
-    id: uuidv4(),
+    id: '',
     name: '',
     description: '',
     price: 0,
@@ -755,7 +755,7 @@ export default function NewOrder({ onCheckout }: any) {
                   placeholder="Item Name"
                   value={newMenuItem.name}
                   onChange={(e) => setNewMenuItem({ ...newMenuItem, name: e.target.value })}
-                />
+                />  
               </div>
 
               <div className="space-y-2">
@@ -805,9 +805,10 @@ export default function NewOrder({ onCheckout }: any) {
                       alert("Please select a category");
                       return;
                     }
+                    setNewMenuItem({ ...newMenuItem, id:uuidv4()})
                     const restaurantId = "67e8f522404a64803d0cea8d";
                     const result = await addMenuToRestaurant(restaurantId, {
-                      id:  uuidv4(),
+                      id:  selectedCategory,
                       items: [newMenuItem]
                     });
                     if (result?.success) {

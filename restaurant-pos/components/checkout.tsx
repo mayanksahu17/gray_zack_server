@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, CreditCard, Wallet, QrCode, DollarSign, Users, Truck, Home, X } from "lucide-react"
+import { ArrowLeft, CreditCard, Wallet, QrCode, DollarSign, Users, Truck, Home, X, CheckCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -19,6 +19,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function Checkout({ order, onComplete, onBack } : any) {
   const [diningOption, setDiningOption] = useState("dine-in")
@@ -32,7 +33,15 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     email: "",
     address: "",
   })
-  
+  const [cardDetails, setCardDetails] = useState({
+    cardNumber: "",
+    expiryDate: "",
+    cvv: ""
+  })
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [isPaymentSuccessful, setIsPaymentSuccessful] = useState(false)
+  const { toast } = useToast()
+
   // Function to fetch tables data
   const fetchTables = async () => {
     try {
@@ -45,6 +54,11 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       }
     } catch (error) {
       console.error("Error fetching tables:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch available tables. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
@@ -55,14 +69,110 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   }
 
   // Handle table selection
-  const handleSelectTable = (tableNum) => {
+  const handleSelectTable = (tableNum : any) => {
     setTableNumber(tableNum)
     setIsTableDialogOpen(false)
   }
+  
+  // Process payment and create order
+  const processPayment = async (orderDetails : any) => {
+    setIsProcessing(true)
+    try {
+      // 1. Process payment
+      const paymentResponse = await fetch("http://localhost:8000/api/v1/admin/hotel/restaurant/payments/process", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: orderDetails.total,
+          currency: "USD",
+          paymentMethod: orderDetails.paymentMethod,
+          cardDetails: paymentMethod === "card" ? cardDetails : null,
+        }),
+      })
+      
+      const paymentData = await paymentResponse.json()
+      
+      if (!paymentData.success) {
+        throw new Error(paymentData.message || "Payment processing failed")
+      }
+      
+      // 2. Create order with payment information
+      const orderResponse = await fetch("http://localhost:8000/api/v1/admin/hotel/restaurant/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...orderDetails,
+          paymentId: paymentData.data.paymentId,
+          paymentStatus: paymentData.data.status,
+          transactionId: paymentData.data.transactionId,
+        }),
+      })
+      
+      const orderData = await orderResponse.json()
+      
+      if (!orderData.success) {
+        throw new Error(orderData.message || "Order creation failed")
+      }
+      
+      setIsPaymentSuccessful(true)
+      
+      // Short delay to show success state before completing
+      setTimeout(() => {
+        onComplete({
+          ...orderDetails,
+          orderId: orderData.data.orderId,
+          paymentId: paymentData.data.paymentId,
+          paymentStatus: paymentData.data.status,
+          transactionId: paymentData.data.transactionId,
+        })
+      }, 1500)
+      
+    } catch (error) {
+      console.error("Error processing payment:", error)
+      toast({
+        title: "Payment Failed",
+        description: error.message || "There was an error processing your payment. Please try again.",
+        variant: "destructive",
+      })
+      setIsProcessing(false)
+    }
+  }
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validate form based on dining option
+    if (diningOption === "dine-in" && !tableNumber) {
+      toast({
+        title: "Table Required",
+        description: "Please select a table for dine-in option.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    if (diningOption === "delivery" && (!customerDetails.name || !customerDetails.phone || !customerDetails.address)) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required delivery details.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    if (paymentMethod === "card" && (!cardDetails.cardNumber || !cardDetails.expiryDate || !cardDetails.cvv)) {
+      toast({
+        title: "Card Details Required",
+        description: "Please fill in all card details for card payment.",
+        variant: "destructive",
+      })
+      return
+    }
 
     const orderDetails = {
       ...order,
@@ -74,14 +184,22 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       timestamp: new Date().toISOString(),
     }
 
-    onComplete(orderDetails)
+    await processPayment(orderDetails)
+  }
+
+  // Handle card detail changes
+  const handleCardDetailChange = (field, value) => {
+    setCardDetails(prev => ({
+      ...prev,
+      [field]: value
+    }))
   }
 
   if (!order) return null
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <Button variant="ghost" size="sm" onClick={onBack} className="mb-6">
+      <Button variant="ghost" size="sm" onClick={onBack} className="mb-6" disabled={isProcessing}>
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Order
       </Button>
 
@@ -151,7 +269,12 @@ export default function Checkout({ order, onComplete, onBack } : any) {
               <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <Label>Dining Option</Label>
-                  <RadioGroup value={diningOption} onValueChange={setDiningOption} className="grid grid-cols-3 gap-4">
+                  <RadioGroup 
+                    value={diningOption} 
+                    onValueChange={setDiningOption} 
+                    className="grid grid-cols-3 gap-4"
+                    disabled={isProcessing}
+                  >
                     <div>
                       <RadioGroupItem value="dine-in" id="dine-in" className="peer sr-only" />
                       <Label
@@ -189,11 +312,23 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                   <div className="space-y-2">
                     <Label htmlFor="table-number">Table Number</Label>
                     <div className="flex gap-2 items-center">
-                      <Button type="button" onClick={handleOpenTableDialog} className="flex-1" variant="outline">
+                      <Button 
+                        type="button" 
+                        onClick={handleOpenTableDialog} 
+                        className="flex-1" 
+                        variant="outline"
+                        disabled={isProcessing}
+                      >
                         {tableNumber ? `Table ${tableNumber}` : "Select a Table"}
                       </Button>
                       {tableNumber && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setTableNumber("")}>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setTableNumber("")}
+                          disabled={isProcessing}
+                        >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
@@ -210,10 +345,12 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                             {tables.map((table) => (
                               <div
                                 key={table._id}
-                                onClick={() => handleSelectTable(table.tableNumber)}
+                                onClick={() => table.status === "available" && handleSelectTable(table.tableNumber)}
                                 className={`
-                                  relative p-4 border-2 rounded-lg cursor-pointer transition-all
-                                  ${table.status === "available" ? "border-green-500 hover:bg-green-50" : "border-red-300 bg-red-50"}
+                                  relative p-4 border-2 rounded-lg transition-all
+                                  ${table.status === "available" 
+                                    ? "border-green-500 hover:bg-green-50 cursor-pointer" 
+                                    : "border-red-300 bg-red-50 cursor-not-allowed"}
                                 `}
                               >
                                 <div className="flex justify-between items-start">
@@ -265,6 +402,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                           onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })}
                           placeholder="Full name"
                           required
+                          disabled={isProcessing}
                         />
                       </div>
                       <div className="space-y-2">
@@ -275,6 +413,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                           onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
                           placeholder="Phone number"
                           required
+                          disabled={isProcessing}
                         />
                       </div>
                     </div>
@@ -286,6 +425,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                         onChange={(e) => setCustomerDetails({ ...customerDetails, email: e.target.value })}
                         placeholder="Email address"
                         type="email"
+                        disabled={isProcessing}
                       />
                     </div>
                     <div className="space-y-2">
@@ -296,6 +436,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                         onChange={(e) => setCustomerDetails({ ...customerDetails, address: e.target.value })}
                         placeholder="Full address"
                         required
+                        disabled={isProcessing}
                       />
                     </div>
                   </div>
@@ -303,11 +444,12 @@ export default function Checkout({ order, onComplete, onBack } : any) {
 
                 <div className="space-y-2">
                   <Label>Payment Method</Label>
-                  <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <Tabs value={paymentMethod} onValueChange={setPaymentMethod} disabled={isProcessing}>
                     <TabsList className="grid grid-cols-4 h-auto">
                       <TabsTrigger
                         value="cash"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        disabled={isProcessing}
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
                         Cash
@@ -315,6 +457,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                       <TabsTrigger
                         value="card"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        disabled={isProcessing}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
                         Card
@@ -322,6 +465,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                       <TabsTrigger
                         value="wallet"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        disabled={isProcessing}
                       >
                         <Wallet className="h-4 w-4 mr-2" />
                         Wallet
@@ -329,6 +473,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                       <TabsTrigger
                         value="qr"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        disabled={isProcessing}
                       >
                         <QrCode className="h-4 w-4 mr-2" />
                         QR
@@ -348,16 +493,34 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                         <CardContent className="pt-4 space-y-4">
                           <div className="space-y-2">
                             <Label htmlFor="card-number">Card Number</Label>
-                            <Input id="card-number" placeholder="1234 5678 9012 3456" />
+                            <Input 
+                              id="card-number" 
+                              placeholder="1234 5678 9012 3456" 
+                              value={cardDetails.cardNumber}
+                              onChange={(e) => handleCardDetailChange('cardNumber', e.target.value)}
+                              disabled={isProcessing}
+                            />
                           </div>
                           <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2 col-span-2">
                               <Label htmlFor="expiry">Expiry Date</Label>
-                              <Input id="expiry" placeholder="MM/YY" />
+                              <Input 
+                                id="expiry" 
+                                placeholder="MM/YY" 
+                                value={cardDetails.expiryDate}
+                                onChange={(e) => handleCardDetailChange('expiryDate', e.target.value)}
+                                disabled={isProcessing}
+                              />
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="cvv">CVV</Label>
-                              <Input id="cvv" placeholder="123" />
+                              <Input 
+                                id="cvv" 
+                                placeholder="123" 
+                                value={cardDetails.cvv}
+                                onChange={(e) => handleCardDetailChange('cvv', e.target.value)}
+                                disabled={isProcessing}
+                              />
                             </div>
                           </div>
                         </CardContent>
@@ -370,6 +533,17 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                           <p className="text-sm text-muted-foreground">
                             Select your digital wallet to proceed with payment.
                           </p>
+                          <div className="grid grid-cols-3 gap-2 mt-4">
+                            <Button variant="outline" className="flex items-center justify-center h-14" disabled={isProcessing}>
+                              Apple Pay
+                            </Button>
+                            <Button variant="outline" className="flex items-center justify-center h-14" disabled={isProcessing}>
+                              Google Pay
+                            </Button>
+                            <Button variant="outline" className="flex items-center justify-center h-14" disabled={isProcessing}>
+                              PayPal
+                            </Button>
+                          </div>
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -387,8 +561,24 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  Confirm & Pay
+                <Button 
+                  type="submit" 
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isProcessing || isPaymentSuccessful}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isPaymentSuccessful ? "Payment Successful" : "Processing Payment..."}
+                    </>
+                  ) : isPaymentSuccessful ? (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Payment Successful
+                    </>
+                  ) : (
+                    "Confirm & Pay"
+                  )}
                 </Button>
               </CardFooter>
             </Card>
@@ -398,4 +588,3 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     </div>
   )
 }
-
