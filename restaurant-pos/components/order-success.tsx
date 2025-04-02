@@ -4,8 +4,62 @@ import { Check, Printer, Mail, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { useEffect } from "react"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function OrderSuccess({ order, onNewOrder } : any) {
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const saveOrder = async () => {
+      try {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            items: order.items.map((item: any) => ({
+              menuItem: item.id,
+              quantity: item.quantity,
+              price: item.price,
+              notes: item.notes || ''
+            })),
+            orderType: order.diningOption,
+            orderSource: 'server',
+            table: order.tableNumber,
+            subtotal: order.subtotal,
+            tax: order.tax,
+            total: order.total,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: 'paid',
+            status: 'pending'
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to save order')
+        }
+
+        toast({
+          title: "Order Saved",
+          description: "The order has been saved to the database.",
+        })
+      } catch (error) {
+        console.error('Error saving order:', error)
+        toast({
+          title: "Error",
+          description: "Failed to save the order. Please try again.",
+          variant: "destructive",
+        })
+      }
+    }
+
+    if (order) {
+      saveOrder()
+    }
+  }, [order, toast])
+
   if (!order) return null
 
   // Format date for receipt
@@ -91,9 +145,7 @@ export default function OrderSuccess({ order, onNewOrder } : any) {
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
           <div className="flex gap-4 w-full">
-            <Button variant="outline" className="flex-1"
-              // onClick={() => printReceipt(selectedOrder)}
-             >
+            <Button variant="outline" className="flex-1">
               <Printer className="mr-2 h-4 w-4" />
               Print Receipt
             </Button>
