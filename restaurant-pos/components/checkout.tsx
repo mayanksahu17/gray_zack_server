@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, CreditCard, Wallet, QrCode, DollarSign, Users, Truck, Home } from "lucide-react"
+import { ArrowLeft, CreditCard, Wallet, QrCode, DollarSign, Users, Truck, Home, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -10,17 +10,55 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 
-export default function Checkout({ order, onComplete, onBack }) {
+export default function Checkout({ order, onComplete, onBack } : any) {
   const [diningOption, setDiningOption] = useState("dine-in")
   const [tableNumber, setTableNumber] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("cash")
+  const [isTableDialogOpen, setIsTableDialogOpen] = useState(false)
+  const [tables, setTables] = useState([])
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
     phone: "",
     email: "",
     address: "",
   })
+  
+  // Function to fetch tables data
+  const fetchTables = async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
+      )
+      const data = await response.json()
+      if (data.success) {
+        setTables(data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching tables:", error)
+    }
+  }
+
+  // Handle opening the table selection dialog
+  const handleOpenTableDialog = () => {
+    fetchTables()
+    setIsTableDialogOpen(true)
+  }
+
+  // Handle table selection
+  const handleSelectTable = (tableNum) => {
+    setTableNumber(tableNum)
+    setIsTableDialogOpen(false)
+  }
 
   // Handle form submission
   const handleSubmit = (e) => {
@@ -150,13 +188,69 @@ export default function Checkout({ order, onComplete, onBack }) {
                 {diningOption === "dine-in" && (
                   <div className="space-y-2">
                     <Label htmlFor="table-number">Table Number</Label>
-                    <Input
-                      id="table-number"
-                      value={tableNumber}
-                      onChange={(e) => setTableNumber(e.target.value)}
-                      placeholder="Enter table number"
-                      required
-                    />
+                    <div className="flex gap-2 items-center">
+                      <Button type="button" onClick={handleOpenTableDialog} className="flex-1" variant="outline">
+                        {tableNumber ? `Table ${tableNumber}` : "Select a Table"}
+                      </Button>
+                      {tableNumber && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setTableNumber("")}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <Dialog open={isTableDialogOpen} onOpenChange={setIsTableDialogOpen}>
+                      <DialogContent className="max-w-3xl max-h-[80vh]">
+                        <DialogHeader>
+                          <DialogTitle>Select a Table</DialogTitle>
+                          <DialogDescription>Choose an available table from the floor plan</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-[500px] pr-4">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg">
+                            {tables.map((table) => (
+                              <div
+                                key={table._id}
+                                onClick={() => handleSelectTable(table.tableNumber)}
+                                className={`
+                                  relative p-4 border-2 rounded-lg cursor-pointer transition-all
+                                  ${table.status === "available" ? "border-green-500 hover:bg-green-50" : "border-red-300 bg-red-50"}
+                                `}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <h3 className="font-bold text-lg">{table.tableNumber}</h3>
+                                    <p className="text-sm text-muted-foreground">{table.location}</p>
+                                  </div>
+                                  <Badge variant={table.status === "available" ? "outline" : "destructive"}>
+                                    {table.status}
+                                  </Badge>
+                                </div>
+                                <div className="mt-2">
+                                  <p className="text-sm">Capacity: {table.capacity} people</p>
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {table.features.map((feature, idx) => (
+                                      <Badge key={idx} variant="secondary" className="text-xs">
+                                        {feature}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                                {table.status === "available" && (
+                                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-green-500/10 rounded-lg">
+                                    <Button size="sm">Select</Button>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end gap-2">
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                          </DialogClose>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 )}
 
