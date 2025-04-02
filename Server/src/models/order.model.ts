@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface IOrder extends Document {
   orderNumber: string;
@@ -105,19 +106,9 @@ const OrderSchema = new Schema<IOrder>(
 // Generate unique order number
 OrderSchema.pre('save', async function(next) {
   if (this.isNew) {
-    const date = new Date();
-    const prefix = date.getFullYear().toString().slice(-2) + 
-                  (date.getMonth() + 1).toString().padStart(2, '0') + 
-                  date.getDate().toString().padStart(2, '0');
-    
-    const lastOrder = await mongoose.models.Order.findOne({}, {}, { sort: { 'orderNumber': -1 } });
-    let counter = 1;
-    
-    if (lastOrder && lastOrder.orderNumber.startsWith(prefix)) {
-      counter = parseInt(lastOrder.orderNumber.slice(6)) + 1;
-    }
-    
-    this.orderNumber = `${prefix}-${counter.toString().padStart(4, '0')}`;
+    // Generate a UUID and take first 3 characters
+    const uuid = uuidv4().replace(/-/g, '').substring(0, 3).toUpperCase();
+    this.orderNumber = uuid;
   }
   next();
 });
