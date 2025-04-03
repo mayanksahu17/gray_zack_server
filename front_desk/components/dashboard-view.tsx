@@ -45,7 +45,7 @@ export function DashboardView() {
 
   const renderDashboard = () => {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-4 md:flex-row">
           <Card className="flex-1">
             <CardHeader className="pb-2">
@@ -321,7 +321,7 @@ export function DashboardView() {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 max-w-full">
           <header className="sticky top-0 z-10 border-b bg-background">
             <div className="flex h-16 items-center justify-between px-6">
               <div className="flex items-center gap-4 md:w-1/3">

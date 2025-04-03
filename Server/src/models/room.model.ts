@@ -5,7 +5,7 @@ enum RoomType {
   STANDARD = 'standard',
   DELUXE = 'deluxe',
   SUITE = 'suite',
-  PRESIDENTIAL = 'presidential'
+  ACCESSIBLE = 'Accessible'
 }
 
 // Define enum for room status
@@ -22,6 +22,7 @@ export interface IRoomDocument extends Document {
   roomNumber: string;
   type: RoomType;
   floor: number;
+  beds: string,
   capacity: number;
   amenities: string[];
   pricePerNight: number;
@@ -59,6 +60,10 @@ const roomSchema = new Schema<IRoomDocument>(
         validator: Number.isInteger,
         message: 'Floor number must be an integer'
       }
+    },
+    beds : {
+      type : String,
+      required : [true, 'beds number is required']
     },
     capacity: {
       type: Number,

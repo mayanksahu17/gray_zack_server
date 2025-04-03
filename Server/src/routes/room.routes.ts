@@ -1,13 +1,31 @@
-import { Router } from 'express'
-import { Request, Response } from 'express'
+import { Router } from 'express';
 import { verifyJWT } from "../middleware/auth.middleware";
-import { upload } from "../middleware/multer.middleware";
-import { createBook } from '../controller/books.controller'
-import { createBulkRooms , test } from '../controller/room.controller';
+import { 
+  createRoom, 
+  getRooms, 
+  getRoomById,
+  updateRoom, 
+  deleteRoom,
+  updateRoomStatus,
+  markRoomAsCleaned
+} from '../controller/room.controller';
 
 const router: Router = Router();
 
-router.route("/createBulkRooms").get(createBulkRooms);
-router.route("/test").get(test);
+// Public routes (you might want to protect these with JWT in production)
+router.route('/')
+  .post(verifyJWT, createRoom)
+  .get(getRooms);
 
-export default router
+router.route('/:id')
+  .get(getRoomById)
+  .patch(verifyJWT, updateRoom)
+  .delete(verifyJWT, deleteRoom);
+
+router.route('/:id/status')
+  .patch(verifyJWT, updateRoomStatus);
+
+router.route('/:id/clean')
+  .patch(verifyJWT, markRoomAsCleaned);
+
+export default router;

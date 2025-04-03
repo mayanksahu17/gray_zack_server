@@ -230,7 +230,7 @@ export default function Inventory() {
   }
 
   // Handle editing an item
-  const handleEditItem = (item) => {
+  const handleEditItem = (item : any) => {
     setSelectedItem(item)
     setIsEditItemDialogOpen(true)
   }
@@ -243,7 +243,7 @@ export default function Inventory() {
   }
 
   // Get status badge color
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status : any) => {
     switch (status) {
       case "in-stock":
         return <Badge className="bg-green-500">In Stock</Badge>
@@ -257,7 +257,7 @@ export default function Inventory() {
   }
 
   // Get stock level indicator
-  const getStockLevelIndicator = (item) => {
+  const getStockLevelIndicator = (item : any) => {
     const percentage = (item.quantity / item.minQuantity) * 100
 
     if (item.quantity === 0) {

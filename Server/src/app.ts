@@ -41,10 +41,12 @@ import hotelAdminRouter from './routes/admin.hotel.route'
 import staffRouter from './routes/staff.route'
 import restaurantRouter from './routes/restaurant.route'
 import orderRoutes from './routes/order.route'
+import roomRoutes from './routes/room.routes'
 
 app.use('/api/v1.0/admin',adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
 app.use('/api/v1/staff/hotel', staffRouter)
+app.use('/api/v1/room', roomRoutes)
 app.use('/api/v1/admin/hotel/restaurant', restaurantRouter)
 app.use('/api/restaurants', restaurantRouter)
 app.use('/api/orders', orderRoutes)

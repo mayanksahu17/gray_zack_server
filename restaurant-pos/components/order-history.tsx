@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Search, Filter, Eye, Download, Printer, Calendar, ArrowUpDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,36 +18,157 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { useToast } from "@/components/ui/use-toast"
-
 interface OrderItem {
-  menuItem: {
-    name: string;
-    price: number;
-  };
+  name: string;
   quantity: number;
   price: number;
-  notes?: string;
 }
 
 interface Order {
-  _id: string;
-  orderNumber: string;
-  customer?: {
-    name: string;
-  };
-  createdAt: string;
-  items: OrderItem[];
+  id: string;
+  customer: string;
+  date: string;
+  items: number;
   total: number;
-  status: "completed" | "pending" | "cancelled" | "preparing" | "ready" | "delivered";
-  orderType: "dine-in" | "takeout" | "delivery" | "room-service" | "kiosk" | "qr-code";
-  table?: {
-    tableNumber: string;
-  };
-  paymentMethod: "cash" | "card" | "room_charge" | "mobile";
-  subtotal: number;
-  tax: number;
+  status: "completed" | "pending" | "cancelled" | string; // You can refine this union if needed
+  type: "dine-in" | "takeaway" | "delivery" | string;
+  table?: string; // Optional, in case it's not present for takeaway/delivery
+  payment: "cash" | "card" | "upi" | string;
+  details: OrderItem[];
 }
+
+// Sample order data
+const orders = [
+  {
+    id: "ORD-1001",
+    customer: "Walk-in Customer",
+    date: "2023-06-15 12:30 PM",
+    items: 4, 
+    total: 45.99,
+    status: "completed",
+    type: "dine-in",
+    table: "5",
+    payment: "cash",
+    paymentId : "TXN-43546263",
+    details: [
+      { name: "Margherita Pizza", quantity: 1, price: 12.99 },
+      { name: "Garlic Bread", quantity: 1, price: 4.99 },
+      { name: "Chicken Wings", quantity: 1, price: 8.99 },
+      { name: "Soft Drink", quantity: 2, price: 2.99 },
+    ],
+  },
+  {
+    id: "ORD-1002",
+    customer: "Emma Johnson",
+    date: "2023-06-15 01:45 PM",
+    items: 3,
+    total: 32.5,
+    status: "completed",
+    type: "takeaway",
+    payment: "card",
+    details: [
+      { name: "Chicken Burger", quantity: 2, price: 10.99 },
+      { name: "French Fries", quantity: 1, price: 3.99 },
+      { name: "Iced Tea", quantity: 2, price: 3.49 },
+    ],
+  },
+  {
+    id: "ORD-1003",
+    customer: "Michael Smith",
+    date: "2023-06-15 02:15 PM",
+    items: 5,
+    total: 67.95,
+    status: "completed",
+    type: "delivery",
+    payment: "wallet",
+    details: [
+      { name: "Pasta Carbonara", quantity: 2, price: 13.99 },
+      { name: "Caesar Salad", quantity: 1, price: 8.99 },
+      { name: "Garlic Bread", quantity: 1, price: 4.99 },
+      { name: "Chocolate Cake", quantity: 1, price: 6.99 },
+      { name: "Fresh Juice", quantity: 2, price: 4.99 },
+    ],
+  },
+  {
+    id: "ORD-1004",
+    customer: "Sarah Williams",
+    date: "2023-06-15 03:30 PM",
+    items: 2,
+    total: 21.98,
+    status: "completed",
+    type: "dine-in",
+    table: "3",
+    payment: "cash",
+    details: [
+      { name: "Margherita Pizza", quantity: 1, price: 12.99 },
+      { name: "Soft Drink", quantity: 3, price: 2.99 },
+    ],
+  },
+  {
+    id: "ORD-1005",
+    customer: "James Brown",
+    date: "2023-06-15 04:45 PM",
+    items: 4,
+    total: 39.96,
+    status: "completed",
+    type: "takeaway",
+    payment: "card",
+    details: [
+      { name: "Chicken Burger", quantity: 2, price: 10.99 },
+      { name: "Onion Rings", quantity: 1, price: 4.49 },
+      { name: "Ice Cream", quantity: 1, price: 4.99 },
+      { name: "Coffee", quantity: 2, price: 3.99 },
+    ],
+  },
+  {
+    id: "ORD-1006",
+    customer: "David Miller",
+    date: "2023-06-15 05:30 PM",
+    items: 3,
+    total: 35.97,
+    status: "in-progress",
+    type: "dine-in",
+    table: "8",
+    payment: "card",
+    details: [
+      { name: "Grilled Salmon", quantity: 1, price: 16.99 },
+      { name: "Side Salad", quantity: 1, price: 4.99 },
+      { name: "Fresh Juice", quantity: 2, price: 4.99 },
+    ],
+  },
+  {
+    id: "ORD-1007",
+    customer: "Jennifer Davis",
+    date: "2023-06-15 06:15 PM",
+    items: 5,
+    total: 52.95,
+    status: "in-progress",
+    type: "delivery",
+    payment: "wallet",
+    details: [
+      { name: "Pasta Carbonara", quantity: 1, price: 13.99 },
+      { name: "Garlic Bread", quantity: 1, price: 4.99 },
+      { name: "Chicken Wings", quantity: 1, price: 8.99 },
+      { name: "Cheesecake", quantity: 1, price: 7.99 },
+      { name: "Soft Drink", quantity: 2, price: 2.99 },
+    ],
+  },
+  {
+    id: "ORD-1008",
+    customer: "Robert Wilson",
+    date: "2023-06-15 07:00 PM",
+    items: 4,
+    total: 43.96,
+    status: "cancelled",
+    type: "takeaway",
+    payment: "cash",
+    details: [
+      { name: "Margherita Pizza", quantity: 2, price: 12.99 },
+      { name: "French Fries", quantity: 2, price: 3.99 },
+      { name: "Soft Drink", quantity: 4, price: 2.99 },
+    ],
+  },
+]
 
 export default function OrderHistory() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -55,92 +176,39 @@ export default function OrderHistory() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("today")
   const [selectedOrder, setSelectedOrder] = useState<Order>()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
-
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const response = await fetch('/api/orders')
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders')
-        }
-        const data = await response.json()
-        setOrders(data.data)
-      } catch (error) {
-        console.error('Error fetching orders:', error)
-        toast({
-          title: "Error",
-          description: "Failed to fetch orders. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchOrders()
-  }, [toast])
 
   // Filter orders based on search term and filters
   const filteredOrders = orders.filter((order) => {
     // Search filter
     const searchMatch =
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.customer?.name || 'Walk-in Customer').toLowerCase().includes(searchTerm.toLowerCase())
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customer.toLowerCase().includes(searchTerm.toLowerCase())
 
     // Status filter
     const statusMatch = statusFilter === "all" || order.status === statusFilter
 
     // Type filter
-    const typeMatch = typeFilter === "all" || order.orderType === typeFilter
+    const typeMatch = typeFilter === "all" || order.type === typeFilter
 
-    // Date filter
-    const orderDate = new Date(order.createdAt)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    let dateMatch = true
-    switch (dateFilter) {
-      case "today":
-        dateMatch = orderDate.toDateString() === today.toDateString()
-        break
-      case "yesterday":
-        dateMatch = orderDate.toDateString() === yesterday.toDateString()
-        break
-      case "week":
-        const weekAgo = new Date(today)
-        weekAgo.setDate(weekAgo.getDate() - 7)
-        dateMatch = orderDate >= weekAgo
-        break
-      case "month":
-        const monthAgo = new Date(today)
-        monthAgo.setMonth(monthAgo.getMonth() - 1)
-        dateMatch = orderDate >= monthAgo
-        break
-    }
+    // Date filter is simplified for demo purposes
+    // In a real app, you would compare actual dates
+    const dateMatch = true
 
     return searchMatch && statusMatch && typeMatch && dateMatch
   })
 
   // View order details
-  const viewOrderDetails = (order: Order) => {
+  const viewOrderDetails = (order:  any) => {
     setSelectedOrder(order)
   }
 
   // Get status badge color
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status : any) => {
     switch (status) {
       case "completed":
         return <Badge className="bg-green-500">Completed</Badge>
-      case "preparing":
-        return <Badge className="bg-blue-500">Preparing</Badge>
-      case "ready":
-        return <Badge className="bg-yellow-500">Ready</Badge>
-      case "delivered":
-        return <Badge className="bg-purple-500">Delivered</Badge>
+      case "in-progress":
+        return <Badge className="bg-blue-500">In Progress</Badge>
       case "cancelled":
         return <Badge className="bg-red-500">Cancelled</Badge>
       default:
@@ -149,7 +217,7 @@ export default function OrderHistory() {
   }
 
   // Get order type badge
-  const getTypeBadge = (type: string) => {
+  const getTypeBadge = (type : any) => {
     switch (type) {
       case "dine-in":
         return (
@@ -157,7 +225,7 @@ export default function OrderHistory() {
             Dine-in
           </Badge>
         )
-      case "takeout":
+      case "takeaway":
         return (
           <Badge variant="outline" className="border-amber-500 text-amber-500">
             Takeaway
@@ -175,35 +243,39 @@ export default function OrderHistory() {
   }
 
   // New function to download invoice as PDF
-  const downloadInvoice = (order: Order) => {
+  const downloadInvoice = (order : any) => {
+    // Note: In a real application, this would typically be handled server-side
+    // Here we'll create a simple JSON invoice for demonstration
     const invoice = {
-      orderNumber: order.orderNumber,
-      customer: order.customer?.name || 'Walk-in Customer',
-      date: new Date(order.createdAt).toLocaleString(),
-      items: order.items.map(item => ({
-        name: item.menuItem.name,
-        quantity: item.quantity,
-        price: item.price
-      })),
-      subtotal: order.subtotal.toFixed(2),
-      tax: order.tax.toFixed(2),
+      orderId: order.id,
+      customer: order.customer,
+      date: order.date,
+      items: order.details,
+      subtotal: (order.total * 0.92).toFixed(2),
+      tax: (order.total * 0.08).toFixed(2),
       total: order.total.toFixed(2),
-      type: order.orderType,
+      type: order.type,
       status: order.status,
-      paymentMethod: order.paymentMethod
+      paymentMethod: order.payment
     };
 
+    // Create a blob of the JSON data
     const blob = new Blob([JSON.stringify(invoice, null, 2)], { type: 'application/json' });
+    
+    // Create a link element to trigger download
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `invoice_${order.orderNumber}.json`;
+    link.download = `invoice_${order.id}.json`;
+    
+    // Append to the document, click, and remove
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 
-  // New function to print receipt
-  const printReceipt = (order: Order) => {
+   // New function to print receipt
+   const printReceipt = (order : any) => {
+    // Create a new window for printing
     const printWindow = window.open('', 'PRINT', 'height=800,width=600');
     
     if (!printWindow) {
@@ -211,10 +283,11 @@ export default function OrderHistory() {
       return;
     }
 
+    // Generate receipt HTML
     printWindow.document.write(`
       <html>
         <head>
-          <title>Order Receipt - ${order.orderNumber}</title>
+          <title>Order Receipt - ${order.id}</title>
           <style>
             body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
             h1 { text-align: center; }
@@ -228,12 +301,12 @@ export default function OrderHistory() {
           <h1>Order Receipt</h1>
           <div class="order-details">
             <div>
-              <strong>Order Number:</strong> ${order.orderNumber}<br>
-              <strong>Customer:</strong> ${order.customer?.name || 'Walk-in Customer'}<br>
-              <strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}
+              <strong>Order ID:</strong> ${order.id}<br>
+              <strong>Customer:</strong> ${order.customer}<br>
+              <strong>Date:</strong> ${order.date}
             </div>
             <div>
-              <strong>Order Type:</strong> ${order.orderType.charAt(0).toUpperCase() + order.orderType.slice(1)}
+              <strong>Order Type:</strong> ${order.type.charAt(0).toUpperCase() + order.type.slice(1)}
             </div>
           </div>
           <table>
@@ -246,9 +319,9 @@ export default function OrderHistory() {
               </tr>
             </thead>
             <tbody>
-              ${order.items.map(item => `
+              ${order.details.map((item : any) => `
                 <tr>
-                  <td>${item.menuItem.name}</td>
+                  <td>${item.name}</td>
                   <td>${item.quantity}</td>
                   <td>$${item.price.toFixed(2)}</td>
                   <td>$${(item.quantity * item.price).toFixed(2)}</td>
@@ -257,16 +330,18 @@ export default function OrderHistory() {
             </tbody>
           </table>
           <div class="total">
-            <p>Subtotal: $${order.subtotal.toFixed(2)}</p>
-            <p>Tax: $${order.tax.toFixed(2)}</p>
+            <p>Subtotal: $${(order.total * 0.92).toFixed(2)}</p>
+            <p>Tax (8%): $${(order.total * 0.08).toFixed(2)}</p>
             <p><strong>Total: $${order.total.toFixed(2)}</strong></p>
           </div>
         </body>
       </html>
     `);
 
-    printWindow.focus();
+    // printWindow.document.close(); // necessary for IE >= 10
+    printWindow.focus(); // necessary for IE >= 10
     printWindow.print();
+    // printWindow.close();
   }
 
   return (
@@ -278,7 +353,7 @@ export default function OrderHistory() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search by order number or customer name..."
+              placeholder="Search by order ID or customer name..."
               className="pl-8 w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -294,11 +369,8 @@ export default function OrderHistory() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="preparing">Preparing</SelectItem>
-              <SelectItem value="ready">Ready</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="in-progress">In Progress</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -311,7 +383,7 @@ export default function OrderHistory() {
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="dine-in">Dine-in</SelectItem>
-              <SelectItem value="takeout">Takeaway</SelectItem>
+              <SelectItem value="takeaway">Takeaway</SelectItem>
               <SelectItem value="delivery">Delivery</SelectItem>
             </SelectContent>
           </Select>
@@ -326,6 +398,7 @@ export default function OrderHistory() {
               <SelectItem value="yesterday">Yesterday</SelectItem>
               <SelectItem value="week">This Week</SelectItem>
               <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -357,7 +430,7 @@ export default function OrderHistory() {
               <TableRow>
                 <TableHead className="w-[100px]">
                   <Button variant="ghost" className="p-0 h-auto font-medium">
-                    Order Number
+                    Order ID
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
@@ -381,13 +454,7 @@ export default function OrderHistory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Loading orders...
-                  </TableCell>
-                </TableRow>
-              ) : filteredOrders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No orders found matching your filters
@@ -395,14 +462,14 @@ export default function OrderHistory() {
                 </TableRow>
               ) : (
                 filteredOrders.map((order) => (
-                  <TableRow key={order._id}>
-                    <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                    <TableCell>{order.customer?.name || 'Walk-in Customer'}</TableCell>
-                    <TableCell>{new Date(order.createdAt).toLocaleString()}</TableCell>
-                    <TableCell>{order.items.length}</TableCell>
+                  <TableRow key={order.id}>
+                    <TableCell className="font-medium">{order.id}</TableCell>
+                    <TableCell>{order.customer}</TableCell>
+                    <TableCell>{order.date}</TableCell>
+                    <TableCell>{order.items}</TableCell>
                     <TableCell>${order.total.toFixed(2)}</TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>{getTypeBadge(order.orderType)}</TableCell>
+                    <TableCell>{getTypeBadge(order.type)}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" onClick={() => viewOrderDetails(order)}>
                         <Eye className="h-4 w-4" />
@@ -422,9 +489,9 @@ export default function OrderHistory() {
         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Order Details - {selectedOrder.orderNumber}</DialogTitle>
+              <DialogTitle>Order Details - {selectedOrder.id}</DialogTitle>
               <DialogDescription>
-                {new Date(selectedOrder.createdAt).toLocaleString()} • {selectedOrder.customer?.name || 'Walk-in Customer'}
+                {selectedOrder.date} • {selectedOrder.customer}
               </DialogDescription>
             </DialogHeader>
 
@@ -446,9 +513,9 @@ export default function OrderHistory() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedOrder.items.map((item, index) => (
+                    {selectedOrder?.details.map((item : any, index : any) => (
                       <TableRow key={index}>
-                        <TableCell>{item.menuItem.name}</TableCell>
+                        <TableCell>{item.name}</TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
                         <TableCell className="text-right">${(item.quantity * item.price).toFixed(2)}</TableCell>
@@ -460,11 +527,11 @@ export default function OrderHistory() {
                 <div className="space-y-2 border-t pt-2">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>${selectedOrder.subtotal.toFixed(2)}</span>
+                    <span>${(selectedOrder.total * 0.92).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax</span>
-                    <span>${selectedOrder.tax.toFixed(2)}</span>
+                    <span>Tax (8%)</span>
+                    <span>${(selectedOrder.total * 0.08).toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold">
@@ -479,18 +546,18 @@ export default function OrderHistory() {
                   <div className="space-y-2">
                     <h3 className="font-medium">Order Information</h3>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-muted-foreground">Order Number:</div>
-                      <div>{selectedOrder.orderNumber}</div>
+                      <div className="text-muted-foreground">Order ID:</div>
+                      <div>{selectedOrder.id}</div>
                       <div className="text-muted-foreground">Date & Time:</div>
-                      <div>{new Date(selectedOrder.createdAt).toLocaleString()}</div>
+                      <div>{selectedOrder.date}</div>
                       <div className="text-muted-foreground">Status:</div>
                       <div>{getStatusBadge(selectedOrder.status)}</div>
                       <div className="text-muted-foreground">Type:</div>
-                      <div>{getTypeBadge(selectedOrder.orderType)}</div>
-                      {selectedOrder.orderType === "dine-in" && selectedOrder.table && (
+                      <div>{getTypeBadge(selectedOrder.type)}</div>
+                      {selectedOrder.type === "dine-in" && (
                         <>
                           <div className="text-muted-foreground">Table:</div>
-                          <div>{selectedOrder.table.tableNumber}</div>
+                          <div>{selectedOrder.table}</div>
                         </>
                       )}
                     </div>
@@ -500,8 +567,10 @@ export default function OrderHistory() {
                     <h3 className="font-medium">Customer Information</h3>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="text-muted-foreground">Name:</div>
-                      <div>{selectedOrder.customer?.name || 'Walk-in Customer'}</div>
-                      {selectedOrder.orderType === "delivery" && (
+                      <div>{selectedOrder.customer}</div>
+                      <div className="text-muted-foreground">Phone:</div>
+                      <div>+1 (555) 123-4567</div>
+                      {selectedOrder.type === "delivery" && (
                         <>
                           <div className="text-muted-foreground">Address:</div>
                           <div>123 Main St, Anytown, CA 12345</div>
@@ -517,7 +586,7 @@ export default function OrderHistory() {
                   <h3 className="font-medium">Payment Details</h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="text-muted-foreground">Payment Method:</div>
-                    <div className="capitalize">{selectedOrder.paymentMethod}</div>
+                    <div className="capitalize">{selectedOrder.payment}</div>
                     <div className="text-muted-foreground">Payment Status:</div>
                     <div>
                       <Badge className="bg-green-500">Paid</Badge>
@@ -525,7 +594,7 @@ export default function OrderHistory() {
                     <div className="text-muted-foreground">Transaction ID:</div>
                     <div>TXN-{Math.floor(100000 + Math.random() * 900000)}</div>
                     <div className="text-muted-foreground">Payment Date:</div>
-                    <div>{new Date(selectedOrder.createdAt).toLocaleString()}</div>
+                    <div>{selectedOrder.date}</div>
                   </div>
                 </div>
               </TabsContent>

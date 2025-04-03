@@ -395,8 +395,8 @@ export default function NewOrder({ onCheckout }: any) {
             </div>
           ) : (
             <div className="space-y-4">
-              {cart.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4">
+              {cart.map((item : any, index : any) => (
+                 <div key={index} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-medium">{item.name}</h3>

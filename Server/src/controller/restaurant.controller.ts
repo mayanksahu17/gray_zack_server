@@ -1197,7 +1197,7 @@ export const createOrder = async  (req: Request, res: Response) => {
     //   diningOption,
     //   tableNumber,
     //   paymentMethod,
-    //   customerDetails,
+    //   customerDetails, 
     //   orderNumber,
     //   paymentId,
     //   paymentStatus,
