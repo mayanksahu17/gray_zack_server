@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node dotenv/config src/index.ts",
     "dev": "nodemon -r dotenv/config src/index.ts"
   },
   "keywords": [],
