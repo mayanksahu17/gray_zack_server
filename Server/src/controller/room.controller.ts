@@ -2,7 +2,8 @@ import Room from '../models/room.model'
 import { Request, Response } from 'express'
 import { IRoomDocument } from '../models/room.model';
 import mongoose from 'mongoose';
-
+import { createHotelRooms } from '../utills/seedrooms';
+import  {ObjectId} from 'mongodb'
 /**
  * Create a new room
  * @route POST /api/v1/rooms
@@ -373,6 +374,82 @@ export const markRoomAsCleaned = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to mark room as cleaned",
+      error: error.message
+    });
+  }
+};
+
+
+
+
+/**
+ * Seed multiple rooms for a specific hotel
+ * @param req Request object containing hotelId and count
+ * @param res Response object
+ */
+export const seedHotelRooms = async (req: Request, res: Response) => {
+  try {
+    const { hotelId, count } = req.body;
+    
+    if (!hotelId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Hotel ID is required'
+      });
+    }
+    
+    // Create rooms for this specific hotel
+    const hotelObjectId = ObjectId.createFromHexString(hotelId);
+    const roomsToCreate = createHotelRooms(hotelObjectId, parseInt(count as string));
+    
+    // Insert rooms
+    const results = await Promise.all(
+      roomsToCreate.map(async (roomData) => {
+        try {
+          // Check if room already exists
+          const existingRoom = await Room.findOne({ 
+            hotelId: roomData.hotelId,
+            roomNumber: roomData.roomNumber
+          });
+          
+          if (existingRoom) {
+            return {
+              success: false,
+              roomNumber: roomData.roomNumber,
+              message: 'Room already exists'
+            };
+          }
+          
+          // Create new room
+          const room = await Room.create(roomData);
+          return {
+            success: true,
+            roomNumber: room.roomNumber,
+            id: room._id
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            roomNumber: roomData.roomNumber,
+            error: error.message
+          };
+        }
+      })
+    );
+    
+    // Count successes and failures
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    return res.status(200).json({
+      success: true,
+      message: `Seeded ${successful} rooms for hotel ${hotelId} (${failed} failed)`,
+      results
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to seed hotel rooms',
       error: error.message
     });
   }

@@ -7,25 +7,47 @@ import {
   updateRoom, 
   deleteRoom,
   updateRoomStatus,
-  markRoomAsCleaned
+  markRoomAsCleaned,
+  seedHotelRooms
 } from '../controller/room.controller';
 
 const router: Router = Router();
 
 // Public routes (you might want to protect these with JWT in production)
+router.route('/seed-room').post(seedHotelRooms)
+
+// router.route('/')
+//   .get(getRooms)
+//   .post(verifyJWT, createRoom)
+
+// router.route('/:id')
+//   .get(getRoomById)
+//   .patch(verifyJWT, updateRoom)
+//   .delete(verifyJWT, deleteRoom);
+
+// router.route('/:id/status')
+//   .patch(verifyJWT, updateRoomStatus);
+
+// router.route('/:id/clean')
+//   .patch(verifyJWT, markRoomAsCleaned);
+
+
+// public route
+
 router.route('/')
-  .post(verifyJWT, createRoom)
-  .get(getRooms);
+  .get(getRooms)
+  .post(createRoom)
 
 router.route('/:id')
   .get(getRoomById)
-  .patch(verifyJWT, updateRoom)
-  .delete(verifyJWT, deleteRoom);
+  .patch(updateRoom)
+  .delete(deleteRoom);
 
 router.route('/:id/status')
-  .patch(verifyJWT, updateRoomStatus);
+  .patch(updateRoomStatus);
 
 router.route('/:id/clean')
-  .patch(verifyJWT, markRoomAsCleaned);
+  .patch(markRoomAsCleaned);
+
 
 export default router;

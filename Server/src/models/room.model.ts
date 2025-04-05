@@ -13,7 +13,8 @@ enum RoomStatus {
   AVAILABLE = 'available',
   OCCUPIED = 'occupied',
   MAINTENANCE = 'maintenance',
-  CLEANING = 'cleaning'
+  CLEANING = 'cleaning',
+  OUT_OF_ORDER = 'out of order'
 }
 
 // Room interface
