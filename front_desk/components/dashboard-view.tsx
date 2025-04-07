@@ -231,9 +231,9 @@ export function DashboardView() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen">
-        <Sidebar>
+    <SidebarProvider  >
+      <div className="flex min-h-screen"  >
+        <Sidebar >
           <SidebarHeader className="border-b p-4">
             <div className="flex items-center gap-2">
               <Home className="h-6 w-6 text-primary" />
@@ -366,7 +366,7 @@ export function DashboardView() {
               </div>
             </div>
           </header>
-          <main className="p-6">{renderActiveView()}</main>
+          <main  className=" p-6 min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 bg-no-repeat bg-cover">{renderActiveView()}</main>
         </div>
       </div>
     </SidebarProvider>
