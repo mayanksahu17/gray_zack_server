@@ -112,15 +112,7 @@ export default function RestaurantPOS() {
             <span className="sr-only">Order History</span>
           </Button>
 
-          <Button
-            variant={currentScreen === "inventory" ? "secondary" : "ghost"}
-            size="icon"
-            className={`w-12 h-12 rounded-full ${currentScreen === "inventory" ? "bg-blue-100 text-blue-700" : "text-white hover:bg-blue-700/50"}`}
-            onClick={() => navigateTo("inventory")}
-          >
-            <Package2 size={24} />
-            <span className="sr-only">Inventory</span>
-          </Button>
+       
 
           <Button
             variant={currentScreen === "reports" ? "secondary" : "ghost"}

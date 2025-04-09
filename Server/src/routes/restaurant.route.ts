@@ -73,6 +73,11 @@
     // authorizePermission([AdminRole.HOTEL_ADMIN]),
     restaurantController.deleteMenuItem
   );
+
+  router.delete(
+    '/:restaurantId/menu-items/:categoryId',
+    restaurantController.deleteMenuCategory
+  );
   
   // Table Management Routes
   router.post("/:id/tables",restaurantController.addRestaurantTable)
