@@ -40,7 +40,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import axios from 'axios'
-
+// import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 
 
 // Define enum for room types
@@ -333,7 +333,7 @@ export function RoomManagementView() {
     }
     
     try {
-      const response = await axios.delete(`${API_BASE_URL}/${id}`);
+      const response = await axios.delete(`${API_BASE_URL}/room/${id}`);
       
       toast({
         title: "Success",

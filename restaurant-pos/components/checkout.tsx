@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
+// import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 
 export default function Checkout({ order, onComplete, onBack } : any) {
   const [diningOption, setDiningOption] = useState("dine-in")
@@ -43,6 +44,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const { toast } = useToast()
 
   // Function to fetch tables data
+
   const fetchTables = async () => {
     try {
       const response = await fetch(

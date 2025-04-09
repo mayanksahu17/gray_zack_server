@@ -53,6 +53,32 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
+        const response = await fetch('http://localhost:8000/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            items: order.items.map((item: any) => ({
+              menuItem: item.id,
+              quantity: item.quantity,
+              price: item.price,
+              notes: item.notes || ''
+            })),
+            orderType: order.diningOption,
+            orderSource: 'server',
+            table: order.tableNumber,
+            subtotal: order.subtotal,
+            tax: order.tax,
+            total: order.total,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: 'paid',
+            status: 'pending'
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to save order')
         const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders/${orderId}`);
         const data = await response.json();
         

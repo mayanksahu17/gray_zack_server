@@ -2,9 +2,13 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon -r dotenv/config src/index.ts"
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "nodemon -r dotenv/config src/index.ts",
+    "lint": "prettier --check .",
+    "format": "prettier --write ."
   },
   "keywords": [],
   "author": "",
@@ -26,7 +30,8 @@
     "qrcode": "^1.5.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "nodemon": "^3.0.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
