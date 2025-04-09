@@ -1,0 +1,41 @@
+stages:
+  - test
+
+test_client_app:
+  stage: test
+  script:
+    - cd client-app
+    - npm install
+    - npm run test
+  artifacts:
+    when: always
+    paths:
+      - client-app/test-results
+    reports:
+      junit: client-app/test-results/junit.xml
+
+test_admin_panel:
+  stage: test
+  script:
+    - cd admin-panel
+    - npm install
+    - npm run test
+  artifacts:
+    when: always
+    paths:
+      - admin-panel/test-results
+    reports:
+      junit: admin-panel/test-results/junit.xml
+
+test_api_server:
+  stage: test
+  script:
+    - cd api-server
+    - npm install
+    - npm run test
+  artifacts:
+    when: always
+    paths:
+      - api-server/test-results
+    reports:
+      junit: api-server/test-results/junit.xml
