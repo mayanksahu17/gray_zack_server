@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
+// import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 
 export default function Checkout({ order, onComplete, onBack } : any) {
   const [diningOption, setDiningOption] = useState("dine-in")
@@ -43,10 +44,11 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const { toast } = useToast()
 
   // Function to fetch tables data
+
   const fetchTables = async () => {
     try {
       const response = await fetch(
-        "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
+        "http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
       )
       const data = await response.json()
       if (data.success) {
@@ -79,7 +81,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     setIsProcessing(true)
     try {
       // 1. Process payment
-      const paymentResponse = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/payments/process", {
+      const paymentResponse = await fetch("http://localhost:8000/api/v1/admin/hotel/restaurant/payments/process", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -99,7 +101,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       }
       
       // 2. Create order with payment information
-      const orderResponse = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/admin/hotel/restaurant/orders", {
+      const orderResponse = await fetch("http://localhost:8000/api/v1/admin/hotel/restaurant/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

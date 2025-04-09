@@ -13,7 +13,7 @@ export default function OrderSuccess({ order, onNewOrder } : any) {
   useEffect(() => {
     const saveOrder = async () => {
       try {
-        const response = await fetch('https://8tvnlx2t-8000.inc1.devtunnels.ms/api/orders', {
+        const response = await fetch('http://localhost:8000/api/orders', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
