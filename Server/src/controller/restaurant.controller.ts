@@ -1197,11 +1197,17 @@ export const getOrders = async (req: Request, res: Response) => {
  */
 export const getOrderById = async (req: Request, res: Response) => {
   try {
-    const { orderNumber } = req.params;
-    // console.log(orderId);
+    const { orderId } = req.params;
     
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format'
+      });
+    }
 
-    const order = await Order.findOne({ orderNumber });
+    const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ 
         success: false, 

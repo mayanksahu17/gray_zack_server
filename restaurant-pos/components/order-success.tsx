@@ -53,33 +53,13 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            items: order.items.map((item: any) => ({
-              menuItem: item.id,
-              quantity: item.quantity,
-              price: item.price,
-              notes: item.notes || ''
-            })),
-            orderType: order.diningOption,
-            orderSource: 'server',
-            table: order.tableNumber,
-            subtotal: order.subtotal,
-            tax: order.tax,
-            total: order.total,
-            paymentMethod: order.paymentMethod,
-            paymentStatus: 'paid',
-            status: 'pending'
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to save order')
+        const restaurantId = "67e8f522404a64803d0cea8d"; // Added missing restaurantId
         const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders/${orderId}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (!data.success) {
@@ -103,6 +83,29 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
       fetchOrderDetails();
     }
   }, [orderId, toast]);
+
+  // Function to handle saving an order
+  // const saveOrder = async (orderData: any) => {
+  //   try {
+  //     const response = await fetch('http://localhost:8000/api/orders', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify(orderData),
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error('Failed to save order');
+  //     }
+      
+  //     const data = await response.json();
+  //     return data;
+  //   } catch (error) {
+  //     console.error("Error saving order:", error);
+  //     throw error;
+  //   }
+  // };
 
   const handlePrintReceipt = () => {
     // Implement receipt printing logic
@@ -303,4 +306,3 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
     </div>
   );
 }
-

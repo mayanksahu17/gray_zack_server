@@ -161,7 +161,7 @@ export default function RestaurantPOS() {
               {currentScreen === "dashboard" && "Dashboard"}
               {currentScreen === "new-order" && "New Order"}
               {currentScreen === "checkout" && "Checkout"}
-              {currentScreen === "success" && "Order Complete"}
+              {currentScreen === "success" && "Order Complete"} 
               {currentScreen === "order-history" && "Order History"}
               {currentScreen === "inventory" && "Inventory Management"}
               {currentScreen === "reports" && "Reports & Analytics"}

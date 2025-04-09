@@ -82,10 +82,12 @@ export default function NewOrder({ onCheckout }: any) {
   })
   const [showAddMenuDialog, setShowAddMenuDialog] = useState(false)
   const [newMenu, setNewMenu] = useState({
+    id: uuidv4(),
     name: '',
     description: '',
     items: [
       {
+        id: uuidv4(),
         name: '',
         description: '',
         price: 0,
@@ -95,7 +97,8 @@ export default function NewOrder({ onCheckout }: any) {
     ],
   })
   const [newMenuItem, setNewMenuItem] = useState({
-    id: '',
+    id: uuidv4(),
+    // id: '',
     name: '',
     description: '',
     price: 0,
