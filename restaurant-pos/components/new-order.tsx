@@ -805,8 +805,11 @@ export default function NewOrder({ onCheckout }: any) {
                       alert("Please select a category");
                       return;
                     }
-                    setNewMenuItem({ ...newMenuItem, id:uuidv4()})
+                    setNewMenuItem({ ...newMenuItem, id:"3984753984"})
+                    console.log(newMenuItem);
+
                     const restaurantId = "67e8f522404a64803d0cea8d";
+                    
                     const result = await addMenuToRestaurant(restaurantId, {
                       id:  selectedCategory,
                       items: [newMenuItem]

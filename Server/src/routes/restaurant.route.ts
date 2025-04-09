@@ -3,7 +3,7 @@
   import { verifyJWT } from '../middleware/auth.middleware';
   import { authorizePermission } from '../middleware/authorize.middleware';
   import { AdminRole } from '../models/administrator.model';
-  // import { Restaurant } from '../models/restaurant.model';
+  import { Restaurant } from '../models/restaurant.model';
   import { StaffRole } from '../models/staff.model';
 
 
