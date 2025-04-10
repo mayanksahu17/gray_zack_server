@@ -61,6 +61,7 @@ import guestRoutes from './routes/guest.route'
 import paymentRoutes from "./routes/payment.route"
 import invoiceRouter from './routes/invoice.route'
 import reservationRoutes from './routes/reservation.route'
+import roomServiceRoutes from './routes/roomService.route'
 app.use('/api/v1.0/admin',adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
 app.use('/api/v1/staff/hotel', staffRouter)
@@ -72,6 +73,7 @@ app.use('/api/v1/guest', guestRoutes)
 app.use('/api/v1/payment', paymentRoutes)
 app.use('/api/v1/invoice', invoiceRouter)
 app.use('/api/v1/reservation', reservationRoutes)
+app.use('/api/v1/room-service', roomServiceRoutes)
 
 
 
