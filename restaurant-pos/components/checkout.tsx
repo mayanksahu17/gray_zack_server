@@ -22,12 +22,69 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/use-toast"
 // import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 
+interface Booking {
+  _id: string
+  roomId: {
+    _id: string
+    roomNumber: string
+    floor: string
+  }
+  guestId: {
+    _id: string
+    firstName: string
+    lastName: string
+  }
+  checkIn: string
+  expectedCheckOut: string
+  status: string
+}
+
+interface OrderItem {
+  id: string
+  name: string
+  price: number
+  quantity: number
+  notes?: string
+  modifiers?: string[]
+  subtotal: number
+  size?: string
+  addons?: string[]
+  cookingPreference?: string
+  specialInstructions?: string
+}
+
+interface OrderDetails {
+  orderId?: string
+  items: OrderItem[]
+  total: number
+  tax: number
+  tip?: number
+  specialInstructions?: string
+  paymentMethod: string
+}
+
+interface Table {
+  _id: string
+  tableNumber: string
+  status: string
+  location: string
+  capacity: number
+  features: string[]
+}
+
+interface FormEvent extends React.FormEvent {
+  preventDefault(): void
+}
+
 export default function Checkout({ order, onComplete, onBack } : any) {
   const [diningOption, setDiningOption] = useState("dine-in")
   const [tableNumber, setTableNumber] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("cash")
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false)
-  const [tables, setTables] = useState([])
+  const [tables, setTables] = useState<Table[]>([])
+  const [activeBookings, setActiveBookings] = useState<Booking[]>([])
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false)
   const [customerInfo, setCustomerInfo] = useState({
     name: "",
     phone: "",
@@ -64,6 +121,32 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     }
   }
 
+  // Function to fetch active bookings
+  const fetchActiveBookings = async (hotelId: string) => {
+    
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/v1/room-service/active-bookings/60d21b4667d0d8992e610c85`,
+        {
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      )
+      const data = await response.json()
+      if (data.success) {
+        setActiveBookings(data.data)
+      }
+    } catch (error) {
+      console.error("Error fetching active bookings:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch active bookings. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
   // Handle opening the table selection dialog
   const handleOpenTableDialog = () => {
     fetchTables()
@@ -75,9 +158,27 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     setTableNumber(tableNum)
     setIsTableDialogOpen(false)
   }
+
+  // Handle opening the booking selection dialog
+  const handleOpenBookingDialog = () => {
+    fetchActiveBookings("67e8f522404a64803d0cea8d") // Replace with actual hotelId
+    setIsBookingDialogOpen(true)
+  }
+
+  // Handle booking selection
+  const handleSelectBooking = (booking: Booking) => {
+    setSelectedBooking(booking)
+    setCustomerInfo({
+      name: `${booking.guestId.firstName} ${booking.guestId.lastName}`,
+      phone: "",
+      email: "",
+      address: `Room ${booking.roomId.roomNumber}`
+    })
+    setIsBookingDialogOpen(false)
+  }
   
   // Process payment and create order
-  const processPayment = async (orderDetails: any) => {
+  const processPayment = async (orderDetails: OrderDetails) => {
     setIsProcessing(true);
     try {
       // 1. Process payment
@@ -146,6 +247,29 @@ export default function Checkout({ order, onComplete, onBack } : any) {
         throw new Error(orderData.message || "Order creation failed");
       }
       
+      // 3. If charging to room, create room service charge
+      if (paymentMethod === "room" && selectedBooking) {
+        const roomServiceResponse = await fetch("http://localhost:8000/api/v1/room-service/charge", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            bookingId: selectedBooking._id,
+            roomId: selectedBooking.roomId._id,
+            orderId: orderData.data._id,
+            hotelId: "67e8f522404a64803d0cea8d", // Replace with actual hotelId
+            amount: orderDetails.total
+          })
+        })
+
+        const roomServiceData = await roomServiceResponse.json()
+        if (!roomServiceData.success) {
+          throw new Error(roomServiceData.message || "Room service charge creation failed")
+        }
+      }
+      
       setIsPaymentSuccessful(true);
       
       // Short delay to show success state before completing
@@ -172,8 +296,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   };
 
   // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
     
     // Validate customer info
     if (!customerInfo.name || !customerInfo.phone) {
@@ -181,25 +305,25 @@ export default function Checkout({ order, onComplete, onBack } : any) {
         title: "Missing Information",
         description: "Please fill in at least name and phone number",
         variant: "destructive",
-      });
-      return;
+      })
+      return
     }
 
-    const orderDetails = {
+    const orderDetails: OrderDetails = {
       ...order,
       customer: customerInfo,
       diningOption,
       tableNumber: diningOption === "dine-in" ? tableNumber : null,
       paymentMethod,
-      orderNumber: Math.floor(1000 + Math.random() * 9000), // Generate random order number
+      orderNumber: Math.floor(1000 + Math.random() * 9000),
       timestamp: new Date().toISOString(),
-    };
+    }
 
-    await processPayment(orderDetails);
-  };
+    await processPayment(orderDetails)
+  }
 
   // Handle card detail changes
-  const handleCardDetailChange = (field, value) => {
+  const handleCardDetailChange = (field: string, value: string) => {
     setCardDetails(prev => ({
       ...prev,
       [field]: value
@@ -224,7 +348,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
             <CardContent>
               <ScrollArea className="h-[300px] pr-4">
                 <div className="space-y-4">
-                  {order.items.map((item, index) => (
+                  {order.items.map((item: OrderItem, index: number) => (
                     <div key={index} className="flex justify-between">
                       <div>
                         <div className="font-medium">
@@ -398,7 +522,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                         </DialogHeader>
                         <ScrollArea className="h-[500px] pr-4">
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg">
-                            {tables.map((table) => (
+                            {tables.map((table: Table) => (
                               <div
                                 key={table._id}
                                 onClick={() => table.status === "available" && handleSelectTable(table.tableNumber)}
@@ -500,8 +624,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
 
                 <div className="space-y-2">
                   <Label>Payment Method</Label>
-                  <Tabs value={paymentMethod} onValueChange={setPaymentMethod} disabled={isProcessing}>
-                    <TabsList className="grid grid-cols-4 h-auto">
+                  <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <TabsList className="grid grid-cols-5 h-auto">
                       <TabsTrigger
                         value="cash"
                         className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -533,6 +657,14 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                       >
                         <QrCode className="h-4 w-4 mr-2" />
                         QR
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="room"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        disabled={isProcessing}
+                      >
+                        <Home className="h-4 w-4 mr-2" />
+                        Room
                       </TabsTrigger>
                     </TabsList>
 
@@ -612,6 +744,79 @@ export default function Checkout({ order, onComplete, onBack } : any) {
                           </div>
                         </CardContent>
                       </Card>
+                    </TabsContent>
+
+                    <TabsContent value="room" className="pt-4">
+                      <Card>
+                        <CardContent className="pt-4">
+                          {selectedBooking ? (
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h3 className="font-medium">Room {selectedBooking.roomId.roomNumber}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Guest: {selectedBooking.guestId.firstName} {selectedBooking.guestId.lastName}
+                                  </p>
+                                </div>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => setSelectedBooking(null)}
+                                  disabled={isProcessing}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-center">
+                              <Button 
+                                onClick={handleOpenBookingDialog} 
+                                variant="outline"
+                                disabled={isProcessing}
+                              >
+                                Select Room
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
+                        <DialogContent className="max-w-3xl">
+                          <DialogHeader>
+                            <DialogTitle>Select a Room</DialogTitle>
+                            <DialogDescription>Choose from active bookings</DialogDescription>
+                          </DialogHeader>
+                          <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
+                            {activeBookings.map((booking) => (
+                              <div
+                                key={booking._id}
+                                onClick={() => handleSelectBooking(booking)}
+                                className="p-4 border rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer"
+                              >
+                                <div className="space-y-2">
+                                  <div className="flex justify-between">
+                                    <h3 className="font-medium">Room {booking.roomId.roomNumber}</h3>
+                                    <Badge variant={booking.status === "checked_in" ? "outline" : "secondary"}>
+                                      {booking.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    Guest: {booking.guestId.firstName} {booking.guestId.lastName}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Check-in: {new Date(booking.checkIn).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                          </DialogClose>
+                        </DialogContent>
+                      </Dialog>
                     </TabsContent>
                   </Tabs>
                 </div>
