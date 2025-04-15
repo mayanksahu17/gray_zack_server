@@ -6,5 +6,6 @@ const router: Router = Router();
 bookingController.finalizeCheckIn
 
 router.route('/finalizeCheckIn').post(bookingController.finalizeCheckIn)
+router.route('/guest/:guestId').get(bookingController.getGuestBookingHistory)
 
 export default router;

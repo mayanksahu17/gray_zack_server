@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Restaurant, MenuItem, Order, PaymentStatus, PaymentMethod, OrderStatus, OrderType } from '../models/restaurant.model';
 import { v4 as uuidv4 } from 'uuid';
+import AWS from 'aws-sdk';
+import multer from 'multer';
 // import { Order } from '../models/order.model';
 // ==========================================
 // Restaurant Information Controllers
@@ -1373,6 +1375,66 @@ export const getRestaurantOrders = async (req: Request, res: Response) => {
       success: false, 
       message: 'Server error', 
       error: error.message 
+    });
+  }
+};
+
+// Configure AWS
+AWS.config.update({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION
+});
+
+const s3 = new AWS.S3();
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // limit file size to 5MB
+  },
+});
+
+// Image upload handler
+export const uploadMenuItemImage = async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const file = req.file;
+    const fileExtension = file.originalname.split('.').pop();
+    const fileName = `menu-items/${uuidv4()}.${fileExtension}`;
+
+    console.log({
+      AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
+      AWS_REGION: process.env.AWS_REGION,
+    });
+    
+
+    const uploadParams = {
+      Bucket: process.env.AWS_BUCKET_NAME!, // <-- notice the !
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      // ACL: 'public-read',
+    };
+    
+
+    const result = await s3.upload(uploadParams).promise();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        imageUrl: result.Location
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading image'
     });
   }
 };

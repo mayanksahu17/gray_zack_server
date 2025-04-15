@@ -1,158 +1,156 @@
-  import express from 'express';
-  import * as restaurantController from '../controller/restaurant.controller'; // Adjust import path as needed
-  import { verifyJWT } from '../middleware/auth.middleware';
-  import { authorizePermission } from '../middleware/authorize.middleware';
-  import { AdminRole } from '../models/administrator.model';
-  import { Restaurant } from '../models/restaurant.model';
-  import { StaffRole } from '../models/staff.model';
+import express from 'express';
+import * as restaurantController from '../controller/restaurant.controller'; // Adjust import path as needed
+import { verifyJWT } from '../middleware/auth.middleware';
+import { authorizePermission } from '../middleware/authorize.middleware';
+import { AdminRole } from '../models/administrator.model';
+import { Restaurant } from '../models/restaurant.model';
+import { StaffRole } from '../models/staff.model';
+import multer from 'multer';
 
+const router = express.Router();
+const upload = multer();
 
+// Public routes
+// router.get('/', restaurantController.getAllRestaurants);
+router.get('/:id', restaurantController.getRestaurantById);
+// router.get('/:id/availability', restaurantController.checkRestaurantAvailability);
+router.get('/:id/menu', restaurantController.getRestaurantMenu);
+router.post('/:id/menu',restaurantController.addMenuCategory)
+// Protected routes - Hotel Admin only
+router.post(
+  '/',
+  verifyJWT,
+  authorizePermission([AdminRole.HOTEL_ADMIN] ),
+  restaurantController.createRestaurant
+);
 
-  const router = express.Router();
+router.post(
+  '/payments/process',
+  // verifyJWT,
+  restaurantController.processPayment
+);
 
-  // Public routes
-  // router.get('/', restaurantController.getAllRestaurants);
-  router.get('/:id', restaurantController.getRestaurantById);
-  // router.get('/:id/availability', restaurantController.checkRestaurantAvailability);
-  router.get('/:id/menu', restaurantController.getRestaurantMenu);
-  router.post('/:id/menu',restaurantController.addMenuCategory)
-  // Protected routes - Hotel Admin only
-  router.post(
-    '/',
-    verifyJWT,
-    authorizePermission([AdminRole.HOTEL_ADMIN] ),
-    restaurantController.createRestaurant
-  );
- 
+router.patch(
+  '/:id',
+  verifyJWT,
+  authorizePermission([AdminRole.HOTEL_ADMIN]),
+  restaurantController.updateRestaurant
+);
 
+// router.delete(
+//   '/:id',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.deleteRestaurant
+// );
 
-  router.post(
-    '/payments/process',
-    // verifyJWT,
-    restaurantController.processPayment
-  );
+// Menu Customization Routes
+router.post(
+  '/:id/menu-items',
+  verifyJWT,
+  // authorizePermission([AdminRole.HOTEL_ADMIN]),
+  // authorizePermission([StaffRole.RESTAURANT_MANAGER]),
+  restaurantController.addMenuItem
+);
 
-  router.patch(
-    '/:id',
-    verifyJWT,
-    authorizePermission([AdminRole.HOTEL_ADMIN]),
-    restaurantController.updateRestaurant
-  );
+router.patch(
+  '/:restaurantId/menu-items/:itemId',
+  // verifyJWT,
+  // authorizePermission([AdminRole.HOTEL_ADMIN]),
+  restaurantController.updateMenuItem
+);
 
+router.delete(
+  '/:restaurantId/menu-items/:categoryId/:itemId',
+  // verifyJWT,
+  // authorizePermission([AdminRole.HOTEL_ADMIN]),
+  restaurantController.deleteMenuItem
+);
 
+router.delete(
+  '/:restaurantId/menu-items/:categoryId',
+  restaurantController.deleteMenuCategory
+);
 
-  // router.delete(
-  //   '/:id',
-  //   verifyJWT,
-  //   authorizePermission([AdminRole.HOTEL_ADMIN]),
-  //   restaurantController.deleteRestaurant
-  // );
+// Table Management Routes
+router.post("/:id/tables",restaurantController.addRestaurantTable)
+router.get("/:id/tables",restaurantController.getRestaurantTables)
+router.patch("/:id/tables/:tableId",restaurantController.updateRestaurantTable)
+router.delete("/:id/tables/:tableId",restaurantController.deleteRestaurantTable)
+router.patch("/:id/tables/:tableId/status",restaurantController.updateTableStatus)
 
-  // Menu Customization Routes
-  router.post(
-    '/:id/menu-items',
-    verifyJWT,
-    // authorizePermission([AdminRole.HOTEL_ADMIN]),
-    // authorizePermission([StaffRole.RESTAURANT_MANAGER]),
-    restaurantController.addMenuItem
-  );
+// Room Service Routes
+// router.post(
+//   '/:id/room-service',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.createRoomServiceOrder
+// );
 
-  router.patch(
-    '/:restaurantId/menu-items/:itemId',
-    // verifyJWT,
-    // authorizePermission([AdminRole.HOTEL_ADMIN]),
-    restaurantController.updateMenuItem
-  );
+// Mobile Ordering Routes
+// router.get(
+//   '/:id/qr-code',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.generateQRCode
+// );
 
+// router.post(
+//   '/:id/mobile-orders',
+//   verifyJWT,
+//   authorizePermission([AdminRole.HOTEL_ADMIN]),
+//   restaurantController.createMobileOrder
+// );
 
+// Order Routes
+router.post(
+  '/:restaurantId/orders',
+  // verifyJWT,
+  restaurantController.createOrder
+);
 
+router.get(
+  '/:restaurantId/orders',
+  // verifyJWT,
+  restaurantController.getRestaurantOrders
+);
 
-  router.delete(
-    '/:restaurantId/menu-items/:categoryId/:itemId',
-    // verifyJWT,
-    // authorizePermission([AdminRole.HOTEL_ADMIN]),
-    restaurantController.deleteMenuItem
-  );
+router.get(
+  '/:restaurantId/orders/:orderId',
+  // verifyJWT,
+  restaurantController.getOrderById
+);
 
-  router.delete(
-    '/:restaurantId/menu-items/:categoryId',
-    restaurantController.deleteMenuCategory
-  );
-  
-  // Table Management Routes
-  router.post("/:id/tables",restaurantController.addRestaurantTable)
-  router.get("/:id/tables",restaurantController.getRestaurantTables)
-  router.patch("/:id/tables/:tableId",restaurantController.updateRestaurantTable)
-  router.delete("/:id/tables/:tableId",restaurantController.deleteRestaurantTable)
-  router.patch("/:id/tables/:tableId/status",restaurantController.updateTableStatus)
- 
+router.patch(
+  '/:restaurantId/orders/:orderId/status',
+  // verifyJWT,
+  restaurantController.updateOrderStatus
+);
 
+router.delete(
+  '/:restaurantId/orders/:orderId',
+  // verifyJWT,
+  restaurantController.deleteOrder
+);
 
-  // Room Service Routes
-  // router.post(
-  //   '/:id/room-service',
-  //   verifyJWT,
-  //   authorizePermission([AdminRole.HOTEL_ADMIN]),
-  //   restaurantController.createRoomServiceOrder
-  // );
+// Payment Routes
+router.post(
+  '/payments/process',
+  // verifyJWT,
+  restaurantController.processPayment
+);
 
-  // Mobile Ordering Routes
-  // router.get(
-  //   '/:id/qr-code',
-  //   verifyJWT,
-  //   authorizePermission([AdminRole.HOTEL_ADMIN]),
-  //   restaurantController.generateQRCode
-  // );
+router.get(
+  '/payments/:paymentId',
+  // verifyJWT,
+  restaurantController.getPaymentDetails
+);
 
-  // router.post(
-  //   '/:id/mobile-orders',
-  //   verifyJWT,
-  //   authorizePermission([AdminRole.HOTEL_ADMIN]),
-  //   restaurantController.createMobileOrder
-  // );
+// Image upload route
+router.post(
+  '/:restaurantId/menu-items/upload-image',
+  upload.single('image'),
+  restaurantController.uploadMenuItemImage
+);
 
-  // Order Routes
-  router.post(
-    '/:restaurantId/orders',
-    // verifyJWT,
-    restaurantController.createOrder
-  );
-
-  router.get(
-    '/:restaurantId/orders',
-    // verifyJWT,
-    restaurantController.getRestaurantOrders
-  );
-
-  router.get(
-    '/:restaurantId/orders/:orderId',
-    // verifyJWT,
-    restaurantController.getOrderById
-  );
-
-  router.patch(
-    '/:restaurantId/orders/:orderId/status',
-    // verifyJWT,
-    restaurantController.updateOrderStatus
-  );
-
-  router.delete(
-    '/:restaurantId/orders/:orderId',
-    // verifyJWT,
-    restaurantController.deleteOrder
-  );
-
-  // Payment Routes
-  router.post(
-    '/payments/process',
-    // verifyJWT,
-    restaurantController.processPayment
-  );
-
-  router.get(
-    '/payments/:paymentId',
-    // verifyJWT,
-    restaurantController.getPaymentDetails
-  );
-
-  export default router;
+export default router;
