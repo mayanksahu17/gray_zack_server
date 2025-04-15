@@ -16,6 +16,9 @@ export function GuestHistoryView() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedGuest, setSelectedGuest] = useState<any>(null)
   const [guests, setGuests] = useState<any[]>([])
+  const [stayHistory, setStayHistory] = useState<any[]>([])
+  const [billingHistory, setBillingHistory] = useState<any[]>([])
+  const [guestNotes, setGuestNotes] = useState<any[]>([])
 
   useEffect(() => {
     fetch("http://localhost:8000/api/v1/guest/hotel/60d21b4667d0d8992e610c85")
@@ -24,6 +27,69 @@ export function GuestHistoryView() {
       .catch((err) => console.error("Error fetching guest data", err))
   }, [])
 
+  // Fetch booking history when a guest is selected
+  useEffect(() => {
+    if (selectedGuest?._id) {
+      // Fetch booking history
+      fetch(`http://localhost:8000/api/v1/booking/guest/${selectedGuest._id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          // Transform booking data to match the stay history format
+          const transformedStayHistory = data.map((booking: any) => ({
+            id: booking._id,
+            checkIn: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            checkOut: new Date(booking.expectedCheckOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            nights: Math.ceil((new Date(booking.expectedCheckOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)),
+            room: booking.roomDetails?.roomNumber || 'N/A',
+            roomType: booking.roomDetails?.type || 'N/A',
+            totalSpent: booking.payment.totalAmount,
+            tags: [
+              booking.status === 'checked_in' ? 'Current Stay' : '',
+              ...booking.addOns.map((addon: any) => addon.name)
+            ].filter(Boolean)
+          }));
+          
+          setStayHistory(transformedStayHistory);
+
+          // Transform billing history
+          const transformedBillingHistory = data.flatMap((booking: any) => {
+            const entries = [];
+            
+            // Add room charge
+            entries.push({
+              id: `room_${booking._id}`,
+              description: `Room Charge - ${booking.roomDetails?.type || 'Room'}`,
+              category: `Room #${booking.roomDetails?.roomNumber || 'N/A'}`,
+              date: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              paymentMethod: booking.payment.method === 'credit_card' ? 
+                           `Card ending in ${booking.payment.last4Digits || '****'}` : 
+                           booking.payment.method,
+              amount: booking.payment.totalAmount - (booking.addOns?.reduce((sum: number, addon: any) => sum + addon.cost, 0) || 0)
+            });
+
+            // Add add-ons as separate entries
+            booking.addOns?.forEach((addon: any, index: number) => {
+              entries.push({
+                id: `addon_${booking._id}_${index}`,
+                description: addon.name,
+                category: 'Additional Services',
+                date: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                paymentMethod: 'Room Charge',
+                amount: addon.cost
+              });
+            });
+
+            return entries;
+          });
+
+          setBillingHistory(transformedBillingHistory);
+        })
+        .catch((err) => console.error("Error fetching booking history", err));
+    } else {
+      setStayHistory([]);
+      setBillingHistory([]);
+    }
+  }, [selectedGuest]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -277,137 +343,4 @@ export function GuestHistoryView() {
     </div>
   )
 }
-
-// Sample data
-const guestData = {
-  id: "guest123",
-  name: "Emily Davis",
-  email: "emily.davis@example.com",
-  phone: "+1 (555) 987-6543",
-}
-
-const stayHistory = [
-  {
-    id: "stay1",
-    checkIn: "Mar 7, 2025",
-    checkOut: "Mar 10, 2025",
-    nights: 3,
-    room: "204",
-    roomType: "Deluxe Queen",
-    totalSpent: 587.25,
-    tags: ["Current Stay", "Gold Member"],
-  },
-  {
-    id: "stay2",
-    checkIn: "Jan 15, 2025",
-    checkOut: "Jan 18, 2025",
-    nights: 3,
-    room: "315",
-    roomType: "Deluxe King",
-    totalSpent: 642.75,
-    tags: ["Business Trip", "Late Checkout"],
-  },
-  {
-    id: "stay3",
-    checkIn: "Nov 22, 2024",
-    checkOut: "Nov 26, 2024",
-    nights: 4,
-    room: "402",
-    roomType: "Junior Suite",
-    totalSpent: 978.5,
-    tags: ["Holiday", "Spa Package"],
-  },
-  {
-    id: "stay4",
-    checkIn: "Aug 5, 2024",
-    checkOut: "Aug 7, 2024",
-    nights: 2,
-    room: "210",
-    roomType: "Standard Queen",
-    totalSpent: 329.8,
-    tags: ["Weekend Stay"],
-  },
-]
-
-const billingHistory = [
-  {
-    id: "bill1",
-    description: "Room Charge - Deluxe Queen",
-    category: "Room #204",
-    date: "Mar 10, 2025",
-    paymentMethod: "Visa **** 4587",
-    amount: 477.0,
-  },
-  {
-    id: "bill2",
-    description: "Restaurant Dinner",
-    category: "Food & Beverage",
-    date: "Mar 9, 2025",
-    paymentMethod: "Room Charge",
-    amount: 78.25,
-  },
-  {
-    id: "bill3",
-    description: "Spa Services",
-    category: "Additional Services",
-    date: "Mar 8, 2025",
-    paymentMethod: "Room Charge",
-    amount: 120.0,
-  },
-  {
-    id: "bill4",
-    description: "Room Service",
-    category: "Food & Beverage",
-    date: "Mar 8, 2025",
-    paymentMethod: "Room Charge",
-    amount: 42.5,
-  },
-  {
-    id: "bill5",
-    description: "Laundry Service",
-    category: "Additional Services",
-    date: "Mar 9, 2025",
-    paymentMethod: "Room Charge",
-    amount: 35.0,
-  },
-  {
-    id: "bill6",
-    description: "Minibar Consumption",
-    category: "Food & Beverage",
-    date: "Mar 10, 2025",
-    paymentMethod: "Room Charge",
-    amount: 15.0,
-  },
-]
-
-const guestNotes = [
-  {
-    id: "note1",
-    title: "Early Check-in Request",
-    content: "Guest has requested early check-in for their next stay if possible. Prefers arrival around 11:00 AM.",
-    date: "Mar 10, 2025",
-    staff: "John Smith",
-  },
-  {
-    id: "note2",
-    title: "Pillow Preference",
-    content: "Guest is allergic to feather pillows. Always provide hypoallergenic pillows.",
-    date: "Jan 18, 2025",
-    staff: "Maria Johnson",
-  },
-  {
-    id: "note3",
-    title: "Room Location",
-    content: "Guest prefers rooms on higher floors away from elevator. Noise sensitive.",
-    date: "Nov 26, 2024",
-    staff: "Robert Wilson",
-  },
-  {
-    id: "note4",
-    title: "Anniversary",
-    content: "Guest mentioned their anniversary is on July 15. Consider special amenities for stays around this date.",
-    date: "Aug 7, 2024",
-    staff: "Sarah Williams",
-  },
-]
 

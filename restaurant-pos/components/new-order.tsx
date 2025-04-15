@@ -93,17 +93,18 @@ export default function NewOrder({ onCheckout }: any) {
         price: 0,
         isVegetarian: false,
         spicyLevel: 0,
+        image: '',
       },
     ],
   })
   const [newMenuItem, setNewMenuItem] = useState({
     id: uuidv4(),
-    // id: '',
     name: '',
     description: '',
     price: 0,
     isVegetarian: false,
     spicyLevel: 0,
+    image: '',
   })
   const [selectedCategory, setSelectedCategory] = useState<string>("")
   const [editingItemIndex, setEditingItemIndex] = useState(null)
@@ -302,6 +303,34 @@ export default function NewOrder({ onCheckout }: any) {
       console.error('Error updating menu item:', error)
     }
   }
+
+  // Add image upload function
+  const handleImageUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch(
+        'http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/upload-image',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        return result.data.imageUrl;
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
 
   return (
     <div className="flex h-full">
@@ -798,6 +827,23 @@ export default function NewOrder({ onCheckout }: any) {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label>Item Image</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const imageUrl = await handleImageUpload(file);
+                      if (imageUrl) {
+                        setNewMenuItem({ ...newMenuItem, image: imageUrl });
+                      }
+                    }
+                  }}
+                />
+              </div>
+
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowAddMenuDialog(false)}>
                   Cancel
@@ -808,7 +854,15 @@ export default function NewOrder({ onCheckout }: any) {
                       alert("Please select a category");
                       return;
                     }
-                    setNewMenuItem({ ...newMenuItem, id:"3984753984"})
+                    setNewMenuItem({
+                      id: uuidv4(),
+                      name: '',
+                      description: '',
+                      price: 0,
+                      isVegetarian: false,
+                      spicyLevel: 0,
+                      image: '',
+                    });
                     console.log(newMenuItem);
 
                     const restaurantId = "67e8f522404a64803d0cea8d";
@@ -821,13 +875,6 @@ export default function NewOrder({ onCheckout }: any) {
                       setShowAddMenuDialog(false);
                       const updatedMenu = await getRestaurentData();
                       setMenuCategories(updatedMenu);
-                      setNewMenuItem({
-                        name: '',
-                        description: '',
-                        price: 0,
-                        isVegetarian: false,
-                        spicyLevel: 0,
-                      });
                     }
                   }}
                 >
@@ -837,15 +884,6 @@ export default function NewOrder({ onCheckout }: any) {
             </TabsContent>
 
             <TabsContent value="new-category" className="space-y-4">
-              {/* <div className="space-y-2">
-                <Label>Category ID</Label>
-                <Input
-                  placeholder="Category ID"
-                  value={newMenu.id}
-                  onChange={(e) => setNewMenu({ ...newMenu, id: e.target.value })}
-                />
-              </div> */}
-
               <div className="space-y-2">
                 <Label>Category Name</Label>
                 <Input
@@ -866,20 +904,6 @@ export default function NewOrder({ onCheckout }: any) {
 
               <Separator />
               <h3 className="font-medium">Add Menu Item</h3>
-
-              {/* <div className="space-y-2">
-                <Label>Item ID</Label>
-                <Input
-                  placeholder="Item ID"
-                  value={newMenu.items[0].id}
-                  onChange={(e) =>
-                    setNewMenu({
-                      ...newMenu,
-                      items: [{ ...newMenu.items[0], id: e.target.value }],
-                    })
-                  }
-                />
-              </div> */}
 
               <div className="space-y-2">
                 <Label>Item Name</Label>
@@ -952,6 +976,26 @@ export default function NewOrder({ onCheckout }: any) {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label>Item Image</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const imageUrl = await handleImageUpload(file);
+                      if (imageUrl) {
+                        setNewMenu({
+                          ...newMenu,
+                          items: [{ ...newMenu.items[0], image: imageUrl }],
+                        });
+                      }
+                    }
+                  }}
+                />
+              </div>
+
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowAddMenuDialog(false)}>
                   Cancel
@@ -965,15 +1009,18 @@ export default function NewOrder({ onCheckout }: any) {
                       const updatedMenu = await getRestaurentData();
                       setMenuCategories(updatedMenu);
                       setNewMenu({
+                        id: uuidv4(),
                         name: '',
                         description: '',
                         items: [
                           {
+                            id: uuidv4(),
                             name: '',
                             description: '',
                             price: 0,
                             isVegetarian: false,
                             spicyLevel: 0,
+                            image: '',
                           },
                         ],
                       });
@@ -1041,6 +1088,32 @@ export default function NewOrder({ onCheckout }: any) {
                 value={editingMenuItem?.spicyLevel || 0}
                 onChange={(e) => setEditingMenuItem({ ...editingMenuItem, spicyLevel: parseInt(e.target.value) })}
                 placeholder="Spicy Level"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Item Image</Label>
+              {editingMenuItem?.image && (
+                <div className="mb-2">
+                  <img
+                    src={editingMenuItem.image}
+                    alt={editingMenuItem.name}
+                    className="w-full h-40 object-cover rounded-md"
+                  />
+                </div>
+              )}
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const imageUrl = await handleImageUpload(file);
+                    if (imageUrl) {
+                      setEditingMenuItem({ ...editingMenuItem, image: imageUrl });
+                    }
+                  }
+                }}
               />
             </div>
           </div>
