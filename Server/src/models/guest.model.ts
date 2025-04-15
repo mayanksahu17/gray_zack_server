@@ -20,15 +20,45 @@ interface PersonalInfo {
   reservationNumber?: string
 }
 
+export interface GuestNote {
+  id: string
+  title: string
+  content: string
+  date: string
+  staff: string
+}
+
+export interface BillingHistory {
+  id: string
+  description: string
+  category: string
+  date: string
+  paymentMethod: string
+  amount: number
+}
+
+export interface StayHistory {
+  id: string
+  checkIn: string
+  checkOut: string
+  nights: number
+  room: string
+  roomType: string
+  totalSpent: number
+  tags: string[]
+}
+
 export interface IGuestDocument extends Document {
   hotelId: Types.ObjectId
   personalInfo: PersonalInfo
   preferences: string[]
   isCorporateGuest?: boolean
   companyName?: string
-  notes?: string
   createdAt: Date
   updatedAt: Date
+  stays: StayHistory[]
+  billing: BillingHistory[]
+  notes: GuestNote[]
 }
 
 const addressSchema = new Schema<Address>(
@@ -87,6 +117,51 @@ const guestSchema = new Schema<IGuestDocument>(
       required: true
     },
     preferences: [{ type: String, trim: true }],
+    isCorporateGuest: { type: Boolean, default: false },
+    companyName: { type: String, trim: true },
+
+    stays: {
+      type: [
+        {
+          id: String,
+          checkIn: String,
+          checkOut: String,
+          nights: Number,
+          room: String,
+          roomType: String,
+          totalSpent: Number,
+          tags: [String]
+        }
+      ],
+      default: []
+    },
+
+    billing: {
+      type: [
+        {
+          id: String,
+          description: String,
+          category: String,
+          date: String,
+          paymentMethod: String,
+          amount: Number
+        }
+      ],
+      default: []
+    },
+
+    notes: {
+      type: [
+        {
+          id: String,
+          title: String,
+          content: String,
+          date: String,
+          staff: String
+        }
+      ],
+      default: []
+    }
   },
   {
     timestamps: true,
@@ -94,7 +169,6 @@ const guestSchema = new Schema<IGuestDocument>(
   }
 )
 
-// Indexes for common queries
 guestSchema.index({ hotelId: 1, 'personalInfo.email': 1 })
 guestSchema.index({ 'personalInfo.phone': 1 })
 guestSchema.index({ 'personalInfo.idNumber': 1 })

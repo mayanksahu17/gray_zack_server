@@ -19,7 +19,7 @@ import { useToast } from "./ui/use-toast"
 import { useRouter } from "next/navigation"
 // import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 // API endpoints
-const API_BASE_URL = "https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1";
+const API_BASE_URL = "http://localhost:8000/api/v1";
 const ROOM_API = `${API_BASE_URL}/room`;
 const GUEST_API = `${API_BASE_URL}/guest`;
 const BOOKING_API = `${API_BASE_URL}/reservation`;
@@ -214,7 +214,7 @@ export function CheckInView() {
   const handleMakePayment = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("https://8tvnlx2t-8000.inc1.devtunnels.ms/api/v1/payment/make-payment", {
+      const res = await fetch("http://localhost:8000/api/v1/payment/make-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1152,11 +1152,12 @@ export function CheckInView() {
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end">
-          <Button onClick={nextStep} disabled={!selectedRoom}>
+        <div className="fixed bottom-4 right-4 z-50">
+          <Button onClick={nextStep} disabled={!selectedRoom} className="shadow-lg">
             Continue to Payment
           </Button>
         </div>
+
       </div>
     )
   }

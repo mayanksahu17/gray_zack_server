@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Calendar, CreditCard, Filter, Mail, Phone, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -15,13 +15,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 export function GuestHistoryView() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedGuest, setSelectedGuest] = useState<any>(null)
+  const [guests, setGuests] = useState<any[]>([])
+
+  useEffect(() => {
+    fetch("http://localhost:8000/api/v1/guest/hotel/60d21b4667d0d8992e610c85")
+      .then((res) => res.json())
+      .then((data) => setGuests(data))
+      .catch((err) => console.error("Error fetching guest data", err))
+  }, [])
+
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would search the database
-    // For demo purposes, we'll just set a selected guest
-    setSelectedGuest(guestData)
+    const found = guests.find((guest) => {
+      const query = searchQuery.toLowerCase()
+      const info = guest.personalInfo
+      return (
+        info.firstName.toLowerCase().includes(query) ||
+        info.lastName.toLowerCase().includes(query) ||
+        info.email.toLowerCase().includes(query) ||
+        info.phone.includes(query) ||
+        info.idNumber.includes(query)
+      )
+    })
+    setSelectedGuest(found || null)
   }
+  
 
   const renderSearchForm = () => {
     return (
@@ -63,46 +82,51 @@ export function GuestHistoryView() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{guestData.name}</span>
+                    <span className="font-medium">
+                    {selectedGuest?.personalInfo?.firstName} {selectedGuest?.personalInfo?.lastName}
+                  </span> 
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{guestData.email}</span>
-                  </div>
+                    <span>{selectedGuest?.personalInfo?.email}</span>
+                    </div>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{guestData.phone}</span>
+                <span>{selectedGuest?.personalInfo?.phone}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    <span>Visa **** 4587</span>
+                    <span>NA</span>
                   </div>
                 </div>
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Member Since:</span>
-                    <span className="font-medium">June 2023</span>
+                    <span className="font-medium">NA</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Loyalty Status:</span>
-                    <span className="font-medium text-primary">Gold</span>
+                    <span className="font-medium text-primary">NA</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Loyalty Points:</span>
-                    <span className="font-medium">2,450</span>
+                    <span className="font-medium">NA</span>
                   </div>
                 </div>
                 <Separator />
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Guest Preferences</div>
                   <div className="rounded-md bg-muted p-3 text-sm">
-                    <ul className="space-y-1">
-                      <li>Prefers high floor rooms</li>
-                      <li>Allergic to feather pillows</li>
-                      <li>Early check-in when available</li>
-                      <li>Prefers room away from elevator</li>
-                    </ul>
+                  <ul className="space-y-1">
+                    {selectedGuest?.preferences?.length ? (
+                      selectedGuest.preferences.map((pref: string, idx: number) => (
+                        <li key={idx}>{pref}</li>
+                      ))
+                    ) : (
+                      <li>NA</li>
+                    )}
+                  </ul>
                   </div>
                 </div>
                 <div className="flex justify-end">
