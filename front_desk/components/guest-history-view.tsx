@@ -236,7 +236,7 @@ export function GuestHistoryView() {
                             {stay.nights} nights · Room {stay.room} · {stay.roomType}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {stay.tags.map((tag, index) => (
+                            {stay.tags.map((tag : any, index : any) => (
                               <span
                                 key={index}
                                 className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
