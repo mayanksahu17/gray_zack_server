@@ -1,5 +1,4 @@
 "use client"
-"use client"
 
 import { useEffect, useState } from "react"
 import { ArrowLeft, CreditCard, DollarSign, Info, Mail, Phone, User, Wallet } from "lucide-react"
@@ -142,7 +141,7 @@ export function CheckInView() {
   };
 
   // Get room details when a room is selected
-  const getRoomDetails = async (roomId) => {
+  const getRoomDetails = async (roomId : string) => {
     try {
       const response = await axios.get(`${ROOM_API}/${roomId}`);
       setRoomDetails(response.data.data);

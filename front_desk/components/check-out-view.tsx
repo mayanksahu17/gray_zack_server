@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Check, CreditCard, DollarSign, Mail, Phone, Printer, Star, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -13,22 +13,212 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Spinner } from "@/components/ui/spinner"
+import { guestService, checkoutService, roomServiceAPI } from "@/lib/api"
+import { formatDate, formatCurrency } from "@/lib/utils"
+
+// Define types for our data structures
+interface AddOn {
+  name: string
+  description?: string
+  cost: number
+}
+
+interface RoomService {
+  _id: string
+  bookingId: string
+  roomId: string
+  orderId: string
+  amount: number
+  status: string
+  chargedToRoom: boolean
+  addedToInvoice: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+interface CheckoutState {
+  isLoading: boolean
+  isSearching: boolean
+  error: string | null
+  guest: any
+  booking: any
+  room: any
+  roomServices: RoomService[]
+  summary: {
+    nightsStayed: number
+    roomRate: number
+    roomChargeTotal: number
+    roomServiceTotal: number
+    addOnTotal: number
+    subtotal: number
+    taxAmount: number
+    grandTotal: number
+    alreadyPaid: number
+    remainingBalance: number
+  }
+  selectedPaymentMethod: 'credit_card' | 'cash' | 'corporate'
+  housekeepingNotes: string
+  guestFeedback: string
+  guestRating: number
+}
 
 export function CheckOutView() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedGuest, setSelectedGuest] = useState<any>(null)
   const [checkoutComplete, setCheckoutComplete] = useState(false)
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    // In a real app, this would search the database
-    // For demo purposes, we'll just set a selected guest
-    setSelectedGuest(guestData)
+  const [checkoutResult, setCheckoutResult] = useState<any>(null)
+  
+  const initialCheckoutState: CheckoutState = {
+    isLoading: false,
+    isSearching: false,
+    error: null,
+    guest: null,
+    booking: null,
+    room: null,
+    roomServices: [],
+    summary: {
+      nightsStayed: 0,
+      roomRate: 0,
+      roomChargeTotal: 0,
+      roomServiceTotal: 0,
+      addOnTotal: 0,
+      subtotal: 0,
+      taxAmount: 0,
+      grandTotal: 0,
+      alreadyPaid: 0,
+      remainingBalance: 0
+    },
+    selectedPaymentMethod: 'credit_card',
+    housekeepingNotes: '',
+    guestFeedback: '',
+    guestRating: 0
+  }
+  
+  const [state, setState] = useState<CheckoutState>(initialCheckoutState)
+  
+  const updateState = (updates: Partial<CheckoutState>) => {
+    setState(prevState => ({ ...prevState, ...updates }))
   }
 
-  const handleCheckout = () => {
-    setCheckoutComplete(true)
-    // window.location.replace("/scheck")
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!searchQuery.trim()) {
+      updateState({ error: "Please enter a search term" })
+      return
+    }
+    
+    updateState({ isSearching: true, error: null })
+    
+    try {
+      // Try to parse the query as different types (email, phone, ID)
+      let searchParams = {}
+      
+      // Check if it might be an email
+      if (searchQuery.includes('@')) {
+        searchParams = { email: searchQuery }
+      }
+      // Check if it might be a phone number
+      else if (/^[+\d\s\-()]+$/.test(searchQuery)) {
+        searchParams = { phone: searchQuery }
+      }
+      // Otherwise try as ID number
+      else {
+        searchParams = { idNumber: searchQuery }
+      }
+      
+      const results = await guestService.searchGuests(searchParams as any)
+      
+      if (results.length === 0) {
+        updateState({ 
+          isSearching: false,
+          error: "No guests found matching your search criteria" 
+        })
+        return
+      }
+      
+      // If we found a guest, get their checkout details
+      await fetchCheckoutDetails(results[0]._id)
+      
+    } catch (error) {
+      console.error('Search error:', error)
+      updateState({ 
+        isSearching: false, 
+        error: error instanceof Error ? error.message : "Failed to search for guests" 
+      })
+    }
+  }
+
+  const fetchCheckoutDetails = async (userId: string) => {
+    updateState({ isLoading: true, error: null })
+    
+    try {
+      const checkoutDetails = await checkoutService.getCheckoutDetails(userId)
+      
+      updateState({
+        isLoading: false,
+        isSearching: false,
+        guest: checkoutDetails.data.guest,
+        booking: checkoutDetails.data.booking,
+        room: checkoutDetails.data.room,
+        roomServices: checkoutDetails.data.roomServices,
+        summary: checkoutDetails.data.summary
+      })
+      
+    } catch (error) {
+      console.error('Checkout details error:', error)
+      updateState({ 
+        isLoading: false,
+        isSearching: false,
+        error: error instanceof Error ? error.message : "Failed to get checkout details" 
+      })
+    }
+  }
+
+  const handlePaymentMethodChange = (value: string) => {
+    updateState({ 
+      selectedPaymentMethod: value as 'credit_card' | 'cash' | 'corporate' 
+    })
+  }
+
+  const handleCheckout = async () => {
+    updateState({ isLoading: true, error: null })
+    
+    try {
+      // Prepare the room service IDs
+      const roomServiceIds = state.roomServices.map(service => service._id)
+      
+      // Process the checkout
+      const checkoutData = {
+        userId: state.guest._id,
+        bookingId: state.booking._id,
+        paymentMethod: state.selectedPaymentMethod,
+        roomServices: roomServiceIds,
+        // You can add additional payment details if needed
+        paymentDetails: {}
+      }
+      
+      const result = await checkoutService.processCheckout(checkoutData)
+      
+      setCheckoutResult(result.data)
+      setCheckoutComplete(true)
+      updateState({ isLoading: false })
+      
+    } catch (error) {
+      console.error('Checkout error:', error)
+      updateState({ 
+        isLoading: false, 
+        error: error instanceof Error ? error.message : "Failed to process checkout" 
+      })
+    }
+  }
+
+  const resetCheckout = () => {
+    setSearchQuery("")
+    setCheckoutComplete(false)
+    setCheckoutResult(null)
+    setState(initialCheckoutState)
   }
 
   const renderSearchForm = () => {
@@ -36,24 +226,37 @@ export function CheckOutView() {
       <Card>
         <CardHeader>
           <CardTitle>Find Guest</CardTitle>
-          <CardDescription>Search by name, room number, or reservation ID</CardDescription>
+          <CardDescription>Search by email, phone number, or ID number</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="flex gap-2">
             <Input
-              placeholder="Enter name, room number, or reservation ID"
+              placeholder="Enter email, phone, or ID number"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1"
+              disabled={state.isSearching}
             />
-            <Button type="submit">Search</Button>
+            <Button type="submit" disabled={state.isSearching}>
+              {state.isSearching ? "Searching..." : "Search"}
+            </Button>
           </form>
+          
+          {state.error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     )
   }
 
   const renderCheckoutComplete = () => {
+    if (!checkoutResult) return null
+    
+    const { invoice, nightsStayed, totalRevenue, checkoutDate, paymentStatus } = checkoutResult
+    
     return (
       <Card className="mx-auto max-w-md text-center">
         <CardHeader>
@@ -69,23 +272,27 @@ export function CheckOutView() {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span>Guest:</span>
-                <span>Emily Davis</span>
+                <span>{state.guest?.personalInfo?.firstName} {state.guest?.personalInfo?.lastName}</span>
               </div>
               <div className="flex justify-between">
                 <span>Room:</span>
-                <span>204</span>
+                <span>{state.room?.roomNumber}</span>
               </div>
               <div className="flex justify-between">
                 <span>Check-in Date:</span>
-                <span>March 7, 2025</span>
+                <span>{formatDate(state.booking?.checkIn)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Check-out Date:</span>
-                <span>March 10, 2025</span>
+                <span>{formatDate(checkoutDate)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Total Paid:</span>
-                <span>$587.25</span>
+                <span>{formatCurrency(totalRevenue)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment Status:</span>
+                <span className="font-medium capitalize">{paymentStatus}</span>
               </div>
             </div>
           </div>
@@ -101,21 +308,17 @@ export function CheckOutView() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-center">
-          <Button
-            onClick={() => {
-              setSelectedGuest(null)
-              setCheckoutComplete(false)
-              setSearchQuery("")
-            }}
-          >
-            New Checkout
-          </Button>
+          <Button onClick={resetCheckout}>New Checkout</Button>
         </CardFooter>
       </Card>
     )
   }
 
   const renderGuestCheckout = () => {
+    if (!state.guest || !state.booking || !state.room) return null
+    
+    const { guest, booking, room, roomServices, summary } = state
+    
     return (
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4">
@@ -127,34 +330,34 @@ export function CheckOutView() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{guestData.name}</span>
+                  <span className="font-medium">{guest.personalInfo.firstName} {guest.personalInfo.lastName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{guestData.email}</span>
+                  <span>{guest.personalInfo.email}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{guestData.phone}</span>
+                  <span>{guest.personalInfo.phone}</span>
                 </div>
               </div>
               <Separator className="my-4" />
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Room:</span>
-                  <span className="font-medium">{guestData.room}</span>
+                  <span className="font-medium">{room.roomNumber}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Check-in:</span>
-                  <span className="font-medium">{guestData.checkIn}</span>
+                  <span className="font-medium">{formatDate(booking.checkIn)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Check-out:</span>
-                  <span className="font-medium">{guestData.checkOut}</span>
+                  <span className="text-sm">Expected Check-out:</span>
+                  <span className="font-medium">{formatDate(booking.expectedCheckOut)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Length of Stay:</span>
-                  <span className="font-medium">{guestData.nights} Nights</span>
+                  <span className="font-medium">{summary.nightsStayed} Nights</span>
                 </div>
               </div>
             </CardContent>
@@ -181,7 +384,12 @@ export function CheckOutView() {
                 <Separator />
                 <div>
                   <Label htmlFor="roomNotes">Notes for Housekeeping</Label>
-                  <Textarea id="roomNotes" placeholder="Add any notes for housekeeping..." />
+                  <Textarea 
+                    id="roomNotes" 
+                    placeholder="Add any notes for housekeeping..." 
+                    value={state.housekeepingNotes}
+                    onChange={(e) => updateState({ housekeepingNotes: e.target.value })}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -197,15 +405,26 @@ export function CheckOutView() {
                   <Label className="mb-2 block">Overall Experience</Label>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map((rating) => (
-                      <Button key={rating} variant="outline" size="icon" className="h-8 w-8 rounded-full">
-                        <Star className={`h-4 w-4 ${rating <= 4 ? "fill-primary text-primary" : ""}`} />
+                      <Button 
+                        key={rating} 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-full"
+                        onClick={() => updateState({ guestRating: rating })}
+                      >
+                        <Star className={`h-4 w-4 ${rating <= state.guestRating ? "fill-primary text-primary" : ""}`} />
                       </Button>
                     ))}
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="feedback">Additional Comments</Label>
-                  <Textarea id="feedback" placeholder="Enter guest feedback..." />
+                  <Textarea 
+                    id="feedback" 
+                    placeholder="Enter guest feedback..." 
+                    value={state.guestFeedback}
+                    onChange={(e) => updateState({ guestFeedback: e.target.value })}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -230,82 +449,72 @@ export function CheckOutView() {
                       <span></span>
                     </div>
                     <div className="ml-4 space-y-1 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span>Deluxe Queen - March 7</span>
-                        <span>$159.00</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Deluxe Queen - March 8</span>
-                        <span>$159.00</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Deluxe Queen - March 9</span>
-                        <span>$159.00</span>
-                      </div>
+                      {Array.from({ length: summary.nightsStayed }).map((_, index) => {
+                        const date = new Date(booking.checkIn);
+                        date.setDate(date.getDate() + index);
+                        return (
+                          <div key={index} className="flex items-center justify-between">
+                            <span>{room.type} - {formatDate(date)}</span>
+                            <span>{formatCurrency(summary.roomRate)}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between font-medium">
-                      <span>Food & Beverage</span>
-                      <span></span>
-                    </div>
-                    <div className="ml-4 space-y-1 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span>Room Service - March 8</span>
-                        <span>$42.50</span>
+                  {roomServices.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between font-medium">
+                        <span>Room Services</span>
+                        <span></span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span>Restaurant - March 9</span>
-                        <span>$78.25</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Minibar</span>
-                        <span>$15.00</span>
+                      <div className="ml-4 space-y-1 text-sm">
+                        {roomServices.map((service, index) => (
+                          <div key={index} className="flex items-center justify-between">
+                            <span>Room Service - {formatDate(service.createdAt)}</span>
+                            <span>{formatCurrency(service.amount)}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between font-medium">
-                      <span>Other Charges</span>
-                      <span></span>
-                    </div>
-                    <div className="ml-4 space-y-1 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span>Spa Services</span>
-                        <span>$120.00</span>
+                  {booking.addOns && booking.addOns.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between font-medium">
+                        <span>Add-On Services</span>
+                        <span></span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span>Laundry</span>
-                        <span>$35.00</span>
+                      <div className="ml-4 space-y-1 text-sm">
+                        {booking.addOns.map((addon: AddOn, index: number) => (
+                          <div key={index} className="flex items-center justify-between">
+                            <span>{addon.name}</span>
+                            <span>{formatCurrency(addon.cost)}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <Separator />
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span>Subtotal</span>
-                      <span>$767.75</span>
+                      <span>{formatCurrency(summary.subtotal)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Taxes (12%)</span>
-                      <span>$92.13</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Resort Fee</span>
-                      <span>$45.00</span>
+                      <span>Taxes (10%)</span>
+                      <span>{formatCurrency(summary.taxAmount)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Prepaid Amount</span>
-                      <span className="text-red-500">-$317.63</span>
+                      <span className="text-red-500">-{formatCurrency(summary.alreadyPaid)}</span>
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between font-bold">
                       <span>Balance Due</span>
-                      <span>$587.25</span>
+                      <span>{formatCurrency(summary.remainingBalance)}</span>
                     </div>
                   </div>
                 </TabsContent>
@@ -313,28 +522,28 @@ export function CheckOutView() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span>Room Charges</span>
-                      <span>$477.00</span>
+                      <span>{formatCurrency(summary.roomChargeTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Food & Beverage</span>
-                      <span>$135.75</span>
+                      <span>Room Services</span>
+                      <span>{formatCurrency(summary.roomServiceTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Other Charges</span>
-                      <span>$155.00</span>
+                      <span>Add-On Services</span>
+                      <span>{formatCurrency(summary.addOnTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Taxes & Fees</span>
-                      <span>$137.13</span>
+                      <span>Taxes</span>
+                      <span>{formatCurrency(summary.taxAmount)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Prepaid Amount</span>
-                      <span className="text-red-500">-$317.63</span>
+                      <span className="text-red-500">-{formatCurrency(summary.alreadyPaid)}</span>
                     </div>
                     <Separator />
                     <div className="flex items-center justify-between font-bold">
                       <span>Balance Due</span>
-                      <span>$587.25</span>
+                      <span>{formatCurrency(summary.remainingBalance)}</span>
                     </div>
                   </div>
                 </TabsContent>
@@ -347,19 +556,16 @@ export function CheckOutView() {
               <CardTitle>Payment</CardTitle>
             </CardHeader>
             <CardContent>
-              <RadioGroup defaultValue="credit-card" className="space-y-3">
+              <RadioGroup 
+                value={state.selectedPaymentMethod} 
+                onValueChange={handlePaymentMethodChange}
+                className="space-y-3"
+              >
                 <div className="flex items-center space-x-2 rounded-md border p-3">
-                  <RadioGroupItem value="credit-card" id="checkout-credit-card" />
+                  <RadioGroupItem value="credit_card" id="checkout-credit-card" />
                   <Label htmlFor="checkout-credit-card" className="flex flex-1 items-center gap-2">
                     <CreditCard className="h-4 w-4" />
                     <span>Credit Card on File</span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 rounded-md border p-3">
-                  <RadioGroupItem value="new-card" id="checkout-new-card" />
-                  <Label htmlFor="checkout-new-card" className="flex flex-1 items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    <span>New Credit Card</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 rounded-md border p-3">
@@ -369,21 +575,46 @@ export function CheckOutView() {
                     <span>Cash</span>
                   </Label>
                 </div>
+                <div className="flex items-center space-x-2 rounded-md border p-3">
+                  <RadioGroupItem value="corporate" id="checkout-corporate" />
+                  <Label htmlFor="checkout-corporate" className="flex flex-1 items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Corporate Account</span>
+                  </Label>
+                </div>
               </RadioGroup>
 
-              <div className="mt-4 rounded-lg border border-dashed p-4">
-                <div className="text-sm text-muted-foreground">
-                  Payment will be processed using the credit card on file:
+              {state.selectedPaymentMethod === 'credit_card' && booking.payment?.last4Digits && (
+                <div className="mt-4 rounded-lg border border-dashed p-4">
+                  <div className="text-sm text-muted-foreground">
+                    Payment will be processed using the credit card on file:
+                  </div>
+                  <div className="mt-2 font-medium">**** **** **** {booking.payment.last4Digits}</div>
                 </div>
-                <div className="mt-2 font-medium">**** **** **** 4587 (Visa)</div>
-                <div className="mt-1 text-sm">Expires: 09/27</div>
-              </div>
+              )}
+              
+              {state.error && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertDescription>{state.error}</AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline">Adjust Bill</Button>
-            <Button onClick={handleCheckout}>Complete Checkout</Button>
+            <Button 
+              variant="outline" 
+              onClick={resetCheckout}
+              disabled={state.isLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCheckout}
+              disabled={state.isLoading}
+            >
+              {state.isLoading ? "Processing..." : "Complete Checkout"}
+            </Button>
           </div>
         </div>
       </div>
@@ -394,22 +625,19 @@ export function CheckOutView() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Guest Check-out</h1>
 
-      {!selectedGuest && !checkoutComplete && renderSearchForm()}
-      {selectedGuest && !checkoutComplete && renderGuestCheckout()}
+      {state.isLoading && !checkoutComplete && (
+        <div className="flex justify-center items-center p-8">
+          <div className="text-center">
+            <div className="mb-4">Loading checkout information...</div>
+            <Spinner size="lg" className="mx-auto text-primary" />
+          </div>
+        </div>
+      )}
+
+      {!state.guest && !checkoutComplete && !state.isLoading && renderSearchForm()}
+      {state.guest && !checkoutComplete && !state.isLoading && renderGuestCheckout()}
       {checkoutComplete && renderCheckoutComplete()}
     </div>
   )
-}
-
-// Sample data
-const guestData = {
-  id: "guest123",
-  name: "Emily Davis",
-  email: "emily.davis@example.com",
-  phone: "+1 (555) 987-6543",
-  room: "204 - Deluxe Queen",
-  checkIn: "March 7, 2025",
-  checkOut: "March 10, 2025",
-  nights: 3,
 }
 

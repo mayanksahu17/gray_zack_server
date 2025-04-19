@@ -6,11 +6,11 @@ const router: Router = Router();
 
 
 router.post('/', guestController.createGuest);
+router.get('/search', guestController.searchGuests);
 router.get('/:id', guestController.getGuestById);
 router.get('/hotel/:hotelId', guestController.getGuestsByHotel);
 router.put('/:id', guestController.updateGuest);
 router.delete('/:id', guestController.deleteGuest);
-router.get('/search', guestController.searchGuests);
 
 
 export default router;
