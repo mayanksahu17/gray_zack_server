@@ -74,7 +74,8 @@ app.use('/api/v1/guest', guestRoutes)
 app.use('/api/v1/payment', paymentRoutes)
 app.use('/api/v1/invoice', invoiceRouter)
 app.use('/api/v1/reservation', reservationRoutes)
-app.use('/api/v1/booking', bookingRoutes)app.use('/api/v1/room-service', roomServiceRoutes)
+app.use('/api/v1/booking', bookingRoutes)
+app.use('/api/v1/room-service', roomServiceRoutes)
 
 
 
