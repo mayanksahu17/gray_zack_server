@@ -77,6 +77,7 @@ export function CheckInView() {
     cvv: "",
     nameOnCard: "",
     amount: "",
+    zipCode: ""
   });
   
   // Add-ons state
@@ -213,16 +214,22 @@ export function CheckInView() {
   const handleMakePayment = async () => {
     try {
       setIsLoading(true);
+      // Format the card expiry data
+      const formattedExpiry = cardInfo.expiryDate.includes('/') ? 
+        cardInfo.expiryDate : 
+        cardInfo.expiryDate.replace(/(\d{2})(\d{2})/, '$1/$2');
+      
       const res = await fetch("http://localhost:8000/api/v1/payment/make-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cardNumber: cardInfo.cardNumber,
-          expiry: cardInfo.expiryDate,
+          expiry: formattedExpiry,
           cvv: cardInfo.cvv,
           amount: parseFloat(cardInfo.amount),
           currency: "USD",
-          userId:guestInfo.email , // Replace with dynamic user ID if available
+          userId: guestInfo.email,
+          zipCode: cardInfo.zipCode
         }),
       });
   
@@ -451,7 +458,7 @@ export function CheckInView() {
   };
 
   // Create new booking
-  const createBooking = async (guestId : string) => {
+  const createBooking = async (guestId: string) => {
     try {
       // Format add-ons for booking
       const addOns = [];
@@ -476,13 +483,12 @@ export function CheckInView() {
       
       // Format payment info
       const payment = {
-        method: paymentMethod === "credit-card" ? "credit_card" : 
-                paymentMethod === "cash" ? "cash" : "online",
+        method: paymentMethod === "credit-card" ? "credit_card" : "cash",
         status: "authorized",
-        securityDeposit: cardInfo.amount, // Default security deposit
+        securityDeposit: parseFloat(cardInfo.amount) || 0,
         totalAmount: billing.total,
-        paidAmount: cardInfo.amount, // Only security deposit paid at check-in
-        last4Digits: cardInfo.cardNumber ? cardInfo.cardNumber.slice(-4) : null,
+        paidAmount: parseFloat(cardInfo.amount) || 0, // Only security deposit paid at check-in
+        last4Digits: paymentMethod === "credit-card" ? cardInfo.cardNumber.slice(-4) : null,
         transactionId: `txn_${Date.now()}`
       };
       
@@ -611,7 +617,7 @@ export function CheckInView() {
 
   // Handle check-in submission
   const handleCheckIn = async () => {
-    // For cash or corporate payment, we can bypass the security deposit check
+    // For credit card payment, we need security deposit to be paid
     if (paymentMethod === "credit-card" && !securityDepositPaid) {
       toast({
         title: "Payment Required",
@@ -620,7 +626,17 @@ export function CheckInView() {
       });
       return;
     }
-  
+
+    // For cash payment, make sure an amount is entered
+    if (paymentMethod === "cash" && (!cardInfo.amount || parseFloat(cardInfo.amount) <= 0)) {
+      toast({
+        title: "Amount Required",
+        description: "Please enter a security deposit amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -636,7 +652,7 @@ export function CheckInView() {
       // 4. Show success message
       toast({
         title: "Check-in Complete",
-        description: `${guestInfo.firstName} ${guestInfo.lastName} has been checked in to Room ${roomDetails.roomNumber}.`,
+        description: `${guestInfo.firstName} ${guestInfo.lastName} has been checked in to Room ${roomDetails?.roomNumber}.`,
       });
       
       // 5. Reset form or redirect
@@ -1233,13 +1249,6 @@ export function CheckInView() {
                     <span>Cash</span>
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2 rounded-md border p-3">
-                  <RadioGroupItem value="online" id="online" />
-                  <Label htmlFor="corporate" className="flex flex-1 items-center gap-2">
-                    <Wallet className="h-4 w-4" />
-                    <span>Online payment</span>
-                  </Label>
-                </div>
               </RadioGroup>
 
               {paymentMethod === "credit-card" && (
@@ -1283,6 +1292,15 @@ export function CheckInView() {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="zipCode">ZIP Code</Label>
+                    <Input
+                      id="zipCode"
+                      placeholder="Enter billing ZIP code"
+                      value={cardInfo.zipCode}
+                      onChange={handleCardInfoChange}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="amount">Security Deposit Amount (USD)</Label>
                     <Input
                       id="amount"
@@ -1292,32 +1310,36 @@ export function CheckInView() {
                       onChange={handleCardInfoChange}
                     />
                   </div>
-                  {/* Replace the existing payment button in the credit card section */}
-                    <Button 
-                      className="mt-4 w-full" 
-                      onClick={handleMakePayment}
-                      disabled={!cardInfo.cardNumber || !cardInfo.expiryDate || !cardInfo.cvv || !cardInfo.nameOnCard || !cardInfo.amount}
-                    >
-                      {securityDepositPaid ? "Payment Complete ✓" : "Process Security Deposit"}
-                    </Button>
+                  {/* Development mode indicator */}
+                  <div className="text-xs p-2 bg-blue-50 text-blue-800 rounded-md border border-blue-200 mt-2">
+                    Running in development mode. Card payments will be simulated and always succeed.
+                  </div>
+                  <Button 
+                    className="mt-4 w-full" 
+                    onClick={handleMakePayment}
+                    disabled={!cardInfo.cardNumber || !cardInfo.expiryDate || !cardInfo.cvv || !cardInfo.nameOnCard || !cardInfo.amount}
+                  >
+                    {securityDepositPaid ? "Payment Complete ✓" : "Process Security Deposit"}
+                  </Button>
                 </div>
               )}
 
-              {(paymentMethod === "cash" || paymentMethod === "online") && (
-                   <div className="mt-4 space-y-3">
-                   
-                   <div>
-                     <Label htmlFor="amount">Security Deposit Amount (USD)</Label>
-                     <Input
-                       id="amount"
-                       type="number"
-                       placeholder="Enter amount"
-                       value={cardInfo.amount}
-                       onChange={handleCardInfoChange}
-                     />
-                   </div>
-                  
-                 </div>
+              {paymentMethod === "cash" && (
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <Label htmlFor="amount">Security Deposit Amount (USD)</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      placeholder="Enter amount"
+                      value={cardInfo.amount}
+                      onChange={handleCardInfoChange}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Please collect the cash amount from the guest before completing check-in.
+                  </p>
+                </div>
               )}
 
             </CardContent>

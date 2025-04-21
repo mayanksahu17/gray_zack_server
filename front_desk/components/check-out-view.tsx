@@ -38,6 +38,14 @@ interface RoomService {
   updatedAt: string
 }
 
+// Card details interface
+interface CardDetails {
+  number: string
+  expiry: string
+  cvv: string
+  zipCode: string
+}
+
 interface CheckoutState {
   isLoading: boolean
   isSearching: boolean
@@ -58,7 +66,8 @@ interface CheckoutState {
     alreadyPaid: number
     remainingBalance: number
   }
-  selectedPaymentMethod: 'credit_card' | 'cash' | 'corporate'
+  selectedPaymentMethod: 'credit_card' | 'cash'
+  cardDetails: CardDetails
   housekeepingNotes: string
   guestFeedback: string
   guestRating: number
@@ -90,6 +99,12 @@ export function CheckOutView() {
       remainingBalance: 0
     },
     selectedPaymentMethod: 'credit_card',
+    cardDetails: {
+      number: '',
+      expiry: '',
+      cvv: '',
+      zipCode: ''
+    },
     housekeepingNotes: '',
     guestFeedback: '',
     guestRating: 0
@@ -178,16 +193,91 @@ export function CheckOutView() {
 
   const handlePaymentMethodChange = (value: string) => {
     updateState({ 
-      selectedPaymentMethod: value as 'credit_card' | 'cash' | 'corporate' 
+      selectedPaymentMethod: value as 'credit_card' | 'cash'
     })
   }
 
+  const handleCardDetailsChange = (field: keyof CardDetails, value: string) => {
+    updateState({
+      cardDetails: {
+        ...state.cardDetails,
+        [field]: value
+      }
+    })
+  }
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only allow digits and format with spaces every 4 chars
+    const value = e.target.value.replace(/[^0-9]/g, '')
+    const formatted = value.replace(/(.{4})/g, '$1 ').trim()
+    handleCardDetailsChange('number', formatted)
+  }
+
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Format as MM/YY
+    let value = e.target.value.replace(/[^0-9]/g, '')
+    if (value.length > 2) {
+      value = value.slice(0, 2) + '/' + value.slice(2, 4)
+    }
+    handleCardDetailsChange('expiry', value)
+  }
+
+  const validateCardDetails = (): boolean => {
+    const { cardDetails, selectedPaymentMethod } = state
+    
+    if (selectedPaymentMethod !== 'credit_card') {
+      return true
+    }
+    
+    // Basic validation
+    if (!cardDetails.number || cardDetails.number.replace(/\s/g, '').length < 16) {
+      updateState({ error: 'Please enter a valid card number' })
+      return false
+    }
+    
+    if (!cardDetails.expiry || cardDetails.expiry.length < 5) {
+      updateState({ error: 'Please enter a valid expiry date (MM/YY)' })
+      return false
+    }
+    
+    if (!cardDetails.cvv || cardDetails.cvv.length < 3) {
+      updateState({ error: 'Please enter a valid CVV' })
+      return false
+    }
+    
+    if (!cardDetails.zipCode) {
+      updateState({ error: 'Please enter a valid ZIP code' })
+      return false
+    }
+    
+    return true
+  }
+
   const handleCheckout = async () => {
-    updateState({ isLoading: true, error: null })
+    // Reset any previous errors
+    updateState({ error: null })
+    
+    // Validate card details if credit card is selected
+    if (!validateCardDetails()) {
+      return
+    }
+    
+    updateState({ isLoading: true })
     
     try {
       // Prepare the room service IDs
       const roomServiceIds = state.roomServices.map(service => service._id)
+      
+      // Format card data for PaidYET
+      const cardData = state.selectedPaymentMethod === 'credit_card' ? {
+        number: state.cardDetails.number.replace(/\s/g, ''),
+        expMonth: state.cardDetails.expiry.split('/')[0].padStart(2, '0'),
+        expYear: state.cardDetails.expiry.includes('/') ? 
+          `20${state.cardDetails.expiry.split('/')[1]}` : 
+          new Date().getFullYear().toString(),
+        cvv: state.cardDetails.cvv,
+        zipCode: state.cardDetails.zipCode
+      } : undefined;
       
       // Process the checkout
       const checkoutData = {
@@ -195,8 +285,7 @@ export function CheckOutView() {
         bookingId: state.booking._id,
         paymentMethod: state.selectedPaymentMethod,
         roomServices: roomServiceIds,
-        // You can add additional payment details if needed
-        paymentDetails: {}
+        paymentDetails: state.selectedPaymentMethod === 'credit_card' ? { card: cardData } : undefined
       }
       
       const result = await checkoutService.processCheckout(checkoutData)
@@ -205,11 +294,29 @@ export function CheckOutView() {
       setCheckoutComplete(true)
       updateState({ isLoading: false })
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Checkout error:', error)
+      
+      let errorMessage = "Failed to process checkout"
+      
+      // Try to extract a more specific error message
+      if (error.message) {
+        if (error.message.includes('401')) {
+          errorMessage = "Payment authorization failed. Please check your card details or try a different payment method."
+        } else if (error.message.includes('400')) {
+          errorMessage = "Invalid payment details. Please check your information and try again."
+        } else if (error.message.includes('500')) {
+          errorMessage = "Server error. Our team has been notified. Please try again later."
+        } else if (error.message.includes('Network Error')) {
+          errorMessage = "Network error. Please check your internet connection and try again."
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       updateState({ 
         isLoading: false, 
-        error: error instanceof Error ? error.message : "Failed to process checkout" 
+        error: errorMessage
       })
     }
   }
@@ -319,6 +426,73 @@ export function CheckOutView() {
     
     const { guest, booking, room, roomServices, summary } = state
     
+    // Card details form component
+    const renderCardDetailsForm = () => {
+      if (state.selectedPaymentMethod !== 'credit_card') return null
+      
+      // Check if we're in development mode
+      const isDevelopmentMode = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+      
+      return (
+        <div className="mt-4 space-y-4 p-4 border rounded-md">
+          <h3 className="font-medium">Enter Card Details</h3>
+          
+          {isDevelopmentMode && (
+            <Alert className="mb-4 bg-blue-50 text-blue-800 border-blue-200">
+              <AlertDescription className="text-xs">
+                Running in development mode. Card payments will be simulated and always succeed.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="card-number">Card Number</Label>
+              <Input 
+                id="card-number" 
+                placeholder="1234 5678 9012 3456" 
+                value={state.cardDetails.number}
+                onChange={handleCardNumberChange}
+                maxLength={19}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="expiry">Expiry (MM/YY)</Label>
+                <Input 
+                  id="expiry" 
+                  placeholder="MM/YY" 
+                  value={state.cardDetails.expiry}
+                  onChange={handleExpiryChange}
+                  maxLength={5}
+                />
+              </div>
+              <div>
+                <Label htmlFor="cvv">CVV</Label>
+                <Input 
+                  id="cvv" 
+                  type="text" 
+                  placeholder="123" 
+                  value={state.cardDetails.cvv}
+                  onChange={(e) => handleCardDetailsChange('cvv', e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                  maxLength={4}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="zip-code">Billing ZIP Code</Label>
+              <Input 
+                id="zip-code" 
+                placeholder="10001" 
+                value={state.cardDetails.zipCode}
+                onChange={(e) => handleCardDetailsChange('zipCode', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-4">
@@ -565,7 +739,7 @@ export function CheckOutView() {
                   <RadioGroupItem value="credit_card" id="checkout-credit-card" />
                   <Label htmlFor="checkout-credit-card" className="flex flex-1 items-center gap-2">
                     <CreditCard className="h-4 w-4" />
-                    <span>Credit Card on File</span>
+                    <span>Credit/Debit Card</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 rounded-md border p-3">
@@ -575,23 +749,9 @@ export function CheckOutView() {
                     <span>Cash</span>
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2 rounded-md border p-3">
-                  <RadioGroupItem value="corporate" id="checkout-corporate" />
-                  <Label htmlFor="checkout-corporate" className="flex flex-1 items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    <span>Corporate Account</span>
-                  </Label>
-                </div>
               </RadioGroup>
 
-              {state.selectedPaymentMethod === 'credit_card' && booking.payment?.last4Digits && (
-                <div className="mt-4 rounded-lg border border-dashed p-4">
-                  <div className="text-sm text-muted-foreground">
-                    Payment will be processed using the credit card on file:
-                  </div>
-                  <div className="mt-2 font-medium">**** **** **** {booking.payment.last4Digits}</div>
-                </div>
-              )}
+              {state.selectedPaymentMethod === 'credit_card' && renderCardDetailsForm()}
               
               {state.error && (
                 <Alert variant="destructive" className="mt-4">
@@ -613,7 +773,14 @@ export function CheckOutView() {
               onClick={handleCheckout}
               disabled={state.isLoading}
             >
-              {state.isLoading ? "Processing..." : "Complete Checkout"}
+              {state.isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Spinner size="sm" />
+                  Processing Payment...
+                </span>
+              ) : (
+                "Complete Checkout"
+              )}
             </Button>
           </div>
         </div>
