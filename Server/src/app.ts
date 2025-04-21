@@ -3,25 +3,26 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app: Express = express();
-
 const whitelist = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://gray-zack-113j.vercel.app',
-  'https://gray-zack.vercel.app'
+  'https://gray-zack.vercel.app',
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
     // allow requests with no origin (like mobile apps or curl)
-    if (!origin || whitelist.includes(origin)) {
-      callback(null, true);
+    if (!origin || whitelist.includes(origin) || true) {
+      callback(null, true); // Allow all origins
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
 }));
+
+
 
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }))

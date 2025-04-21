@@ -27,8 +27,16 @@ export const checkoutService = {
   processCheckout: async (checkoutData: {
     userId: string;
     bookingId: string;
-    paymentMethod: 'credit_card' | 'cash' | 'corporate' | 'online';
-    paymentDetails?: any;
+    paymentMethod: 'credit_card' | 'cash';
+    paymentDetails?: {
+      card?: {
+        number: string;
+        expMonth: string;
+        expYear: string;
+        cvv: string;
+        zipCode: string;
+      }
+    };
     roomServices: string[];
   }) => {
     return fetchWithErrorHandling(`${BASE_URL}checkout/process`, {
