@@ -64,6 +64,7 @@ import reservationRoutes from './routes/reservation.route'
 import bookingRoutes from './routes/booking.route'
 import roomServiceRoutes from './routes/roomService.route'
 import checkoutRoutes from './routes/checkout.route'
+import analyticsRoutes from './routes/analytics.route'
 app.use('/api/v1.0/admin',adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
 app.use('/api/v1/staff/hotel', staffRouter)
@@ -78,6 +79,7 @@ app.use('/api/v1/reservation', reservationRoutes)
 app.use('/api/v1/booking', bookingRoutes)
 app.use('/api/v1/room-service', roomServiceRoutes)
 app.use('/api/v1/checkout', checkoutRoutes)
+app.use('/api/v1/analytics', analyticsRoutes)
 
 
 

@@ -20,7 +20,13 @@ export const ChartContainer = ({
   children,
   config,
   className,
-}: { children: React.ReactNode; config?: any; className?: string }) => {
+  series,
+}: { 
+  children: React.ReactNode; 
+  config?: any; 
+  className?: string;
+  series?: any[];
+}) => {
   return <div className={className}>{children}</div>
 }
 
