@@ -10,7 +10,7 @@ const requiredEnvVars = ["ACCESS_TOKEN_SECRET", "REFRESH_TOKEN_SECRET", "PORT", 
 verifyEnvVariables(requiredEnvVars);
 
 const PORT = process.env.PORT || 8000;
-
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 // Kill any process using the port before starting the server
 try {
     console.log(`Checking and killing process on port ${PORT}...`);
@@ -22,7 +22,7 @@ try {
 
 connectdb()
     .then(() => {
-        app.listen(PORT, () => {
+        app.listen(PORT,ALLOWED_ORIGINS, () => {
             console.log(`🚀 Server is running at port: ${PORT}`);
             app.on("error", (error) => {
                 console.log("❌ Error:", error); 
