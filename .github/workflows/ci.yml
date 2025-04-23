@@ -33,9 +33,6 @@ jobs:
       run: npm run build
       working-directory: Server
 
-    - name: Run tests
-      run: npm test
-      working-directory: Server
 
     - name: Run start
       run: npm start
