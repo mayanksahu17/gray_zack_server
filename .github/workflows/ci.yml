@@ -1,0 +1,42 @@
+name: CI - Node.js Project
+
+on:
+  push:
+    branches: [development]
+  pull_request:
+    branches: [development]
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+
+    env:
+      ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
+      REFRESH_TOKEN_SECRET: ${{ secrets.REFRESH_TOKEN_SECRET }}
+      PORT: ${{ secrets.PORT }}
+      MONGODB_URL: ${{ secrets.MONGODB_URL }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install
+      working-directory: Server
+
+    - name: Run build
+      run: npm run build
+      working-directory: Server
+
+    - name: Run start temporarily (10s health check)
+      run: |
+        npm start &
+        sleep 10
+        echo "✅ Server started successfully. Now cleaning up..."
+        pkill -f "node dist/index.js"
+      working-directory: Server

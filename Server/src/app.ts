@@ -105,14 +105,5 @@ app.use('/api/v1/checkout', checkoutRoutes)
 
 
 
-// import roomRouter from './routes/room.routes'
-// app.use('/api/v1/admin/hotel',hotelRouter)
-// app.use()
-// app.use('hii',async ( res : Response) => {
-//     res.status(200).json({
-//         message : "hii"
-//     })
-// })
-
 
 export { app };
