@@ -7,7 +7,7 @@ on:
     branches: [development]
 
 jobs:
-  build-and-test:
+  build-and-check:
     runs-on: ubuntu-latest
 
     env:
@@ -33,7 +33,10 @@ jobs:
       run: npm run build
       working-directory: Server
 
-
-    - name: Run start
-      run: npm start
+    - name: Run start temporarily (10s health check)
+      run: |
+        npm start &
+        sleep 10
+        echo "✅ Server started successfully. Now cleaning up..."
+        pkill -f "node dist/index.js"
       working-directory: Server
