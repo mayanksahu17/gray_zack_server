@@ -123,25 +123,17 @@ Answer from Perplexity: https://www.perplexity.ai/search/do-you-know-about-paidy
 
 
 
+✅ Push development Branch to GitHub
+bash
+Copy
+Edit
+git push github development
+This will sync the latest development branch from GitLab to GitHub.
+
+git push github development
 
 
-
-
-address
-: 
-"Junheta 461990 Hoshangabad M.P."
-email
-: 
-"mayanksahu0024@gmail.com"
-firstName
-: 
-"Mayank"
-idNumber
-: 
-"444"
-lastName
-: 
-"sahu"
-phone
-: 
-"+916263420394"
+🔁 (Optional) Sync Both Remotes with One Command
+You can even push to both at once:
+git push --all origin
+git push --all github
