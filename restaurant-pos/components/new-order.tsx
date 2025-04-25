@@ -25,7 +25,7 @@ import { log } from "node:console"
 // Async function to fetch restaurant data and return menu
 const getRestaurentData = async () => {
   try {
-    const response = await fetch('http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu')
+    const response = await fetch('http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu')
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
@@ -44,7 +44,7 @@ const getRestaurentData = async () => {
   }
 }
 async function addMenuToRestaurant(restaurantId: string, menuData: any) {
-  const url = `http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/menu`;
+  const url = `http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/menu`;
 
   try {
     const response = await fetch(url, {
@@ -242,7 +242,7 @@ export default function NewOrder({ onCheckout }: any) {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingCategoryId}/${editingMenuItem.id}`,
+        `http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingCategoryId}/${editingMenuItem.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -276,7 +276,7 @@ export default function NewOrder({ onCheckout }: any) {
       });
       
       const response = await fetch(
-        `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingMenuItem.id}`,
+        `http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/${editingMenuItem.id}`,
         {
           method: 'PATCH',
           headers: {
@@ -311,7 +311,7 @@ export default function NewOrder({ onCheckout }: any) {
 
     try {
       const response = await fetch(
-        'http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/upload-image',
+        'http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/menu-items/upload-image',
         {
           method: 'POST',
           body: formData,

@@ -54,7 +54,7 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
     const fetchOrderDetails = async () => {
       try {
         const restaurantId = "67e8f522404a64803d0cea8d"; // Added missing restaurantId
-        const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders/${orderId}`);
+        const response = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders/${orderId}`);
         
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
@@ -87,7 +87,7 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
   // Function to handle saving an order
   // const saveOrder = async (orderData: any) => {
   //   try {
-  //     const response = await fetch('http://localhost:8000/api/orders', {
+  //     const response = await fetch('http://16.171.47.60:8000/api/orders', {
   //       method: 'POST',
   //       headers: {
   //         'Content-Type': 'application/json',

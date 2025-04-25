@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = 'http://localhost:8000/api/v1/analytics'
+const API_BASE = 'http://16.171.47.60:8000/api/v1/analytics'
 
 export const getTodaysTimeline = async (hotelId?: string) => {
   const response = await axios.get(`${API_BASE}/timeline/today`, {

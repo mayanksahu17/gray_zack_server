@@ -4,7 +4,7 @@
 
 ## Base URL
 ```
-http://localhost:8000/api/v1/admin/hotel/restaurant
+http://16.171.47.60:8000/api/v1/admin/hotel/restaurant
 ```
 
 ## Authentication
