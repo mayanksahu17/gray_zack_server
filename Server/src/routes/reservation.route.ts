@@ -13,6 +13,9 @@ router.post('/checkInGuest',reservationController.checkInGuest)
 
 router.get('/getAvailableRooms',reservationController.getAvailableRooms)
 
+router.get('/hotel/:hotelId/available-rooms', reservationController.getAvailableRooms);
+
+router.get('/hotel/:hotelId/daily', reservationController.getDailyBookings);
 
 export default router;
 

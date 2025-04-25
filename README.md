@@ -1,3 +1,84 @@
+# Gray Jack Hotel Management System - Analytics Update
+
+## Overview
+
+This update adds real-time analytics capabilities to the Gray Jack Hotel Management System, replacing mock data with actual data from the database. The focus is on revenue tracking and analytics for better business insights.
+
+## Changes Made
+
+### 1. Server-side Changes
+
+#### Added Analytics Controller
+- Created a new controller at `Server/src/controller/analytics.controller.ts`
+- Implemented endpoints for:
+  - Dashboard summary (occupancy rate, ADR, RevPAR, total revenue)
+  - Occupancy breakdown by room type
+  - Revenue breakdown by room type
+  - Daily occupancy and revenue tracking
+  - Booking sources analytics
+
+#### Enhanced Room Model
+- Updated `Server/src/models/room.model.ts` to include revenue tracking capabilities
+- Added fields for:
+  - Revenue history with daily data
+  - Room revenue tracking
+  - Additional revenue sources
+  - ADR (Average Daily Rate) calculation
+- Added methods to:
+  - Add daily revenue data
+  - Calculate revenue for specific date ranges
+  - Track occupancy nights
+
+### 2. Frontend Changes
+
+#### Added API Services
+- Created `front_desk/api/analytics.ts` for API integration
+- Implemented type-safe interfaces for analytics data
+- Added request functions for all analytics endpoints
+
+#### Updated Reporting View
+- Replaced mock data in `front_desk/components/reporting-view.tsx` with real API data
+- Implemented state management for analytics data
+- Added date range selection for filtering data
+- Added loading states and error handling
+- Enhanced charts to display dynamic data
+- Added detailed tabular views for occupancy and revenue data
+
+## Key Features
+
+1. **Real-time Revenue Tracking**
+   - Track revenue by room type
+   - Break down revenue by source (room, F&B, other)
+   - Calculate key metrics like ADR and RevPAR
+
+2. **Occupancy Analytics**
+   - View occupancy rates by room type
+   - Track daily occupancy changes
+   - Analyze occupancy trends over time
+
+3. **Date Range Selection**
+   - Filter analytics by custom date ranges
+   - Compare data across different periods
+
+4. **Enhanced Visualizations**
+   - Interactive charts for revenue and occupancy
+   - Detailed tabular data for in-depth analysis
+   - Summary cards for key performance indicators
+
+## Integration Notes
+
+- The analytics controller requires MongoDB aggregation capabilities
+- Room revenue data needs to be updated whenever a booking is created or modified
+- The frontend components expect specific data formats from the API
+
+## Future Enhancements
+
+- Guest analytics (booking sources, demographics, repeat business)
+- Forecasting and predictive analytics
+- Custom report generation and export
+- More granular revenue breakdown
+- Competitive market analysis
+
 # Gray Jack
 
 

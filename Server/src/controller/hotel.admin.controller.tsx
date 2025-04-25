@@ -9,6 +9,9 @@ import { render } from '@react-email/render';
 import StaffAssignmentEmail from '../lib/mail-service/mail-templates/notify-staff';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import Room from '../models/room.model';
+import Booking from '../models/booking.model';
+import { BookingStatus } from '../models/booking.model';
 /**
  * Create a new hotel
  * @route POST /api/hotels
@@ -294,6 +297,85 @@ export const getHotelAnalytics = asyncHandler(async (req: Request, res: Response
       // ... other analytics
     }
   });
+});
+
+// Get Hotel System Alerts
+export const getHotelAlerts = asyncHandler(async (req: Request, res: Response) => {
+  const { hotelId } = req.params;
+  const alerts = [];
+
+  try {
+    // 1. Check if all systems are operational
+    // This would typically check connections to various services
+    alerts.push({
+      type: 'success',
+      message: 'All systems operational',
+      time: 'Just now'
+    });
+
+    // 2. Check for maintenance issues
+    const rooms = await Room.find({ 
+      hotelId,
+      status: 'maintenance'
+    });
+
+    if (rooms.length > 0) {
+      alerts.push({
+        type: 'warning',
+        message: `Room ${rooms[0].roomNumber} maintenance scheduled`,
+        time: `${Math.floor(Math.random() * 60)} min ago`
+      });
+    }
+
+    // 3. Check for overbooking issues
+    const today = new Date();
+    const thirtyDaysLater = new Date(today);
+    thirtyDaysLater.setDate(today.getDate() + 30);
+
+    // Get all rooms
+    const totalRooms = await Room.countDocuments({ hotelId });
+    
+    // For each day in the next 30 days, check if there are more bookings than rooms
+    for (let date = today; date <= thirtyDaysLater; date.setDate(date.getDate() + 1)) {
+      const nextDay = new Date(date);
+      nextDay.setDate(date.getDate() + 1);
+      
+      // Count bookings that will be active on this date
+      const bookingsCount = await Booking.countDocuments({
+        hotelId,
+        checkIn: { $lte: nextDay },
+        expectedCheckOut: { $gt: date },
+        status: { $in: [BookingStatus.BOOKED, BookingStatus.CHECKED_IN] }
+      });
+      
+      if (bookingsCount > totalRooms) {
+        const datePart = date.toISOString().split('T')[0];
+        alerts.push({
+          type: 'error',
+          message: `Overbooking detected for ${datePart}`,
+          time: '1 hour ago'
+        });
+        break; // Only report the first overbooking
+      }
+    }
+
+    // 4. Check for low inventory items
+    // This would typically come from an inventory collection
+    // For demonstration, we'll simulate it
+    const lowInventoryItems = Math.floor(Math.random() * 3); // 0-2 low inventory items
+    if (lowInventoryItems > 0) {
+      alerts.push({
+        type: 'warning',
+        message: `${lowInventoryItems} inventory items running low`,
+        time: '3 hours ago'
+      });
+    }
+
+    return res.status(200).json(alerts);
+  } catch (error) {
+    console.error('Error fetching hotel alerts:', error);
+    return res.status(500).json({ message: 'Failed to fetch hotel alerts' });
+  }
 });
 
 // Get Hotel Revenue
