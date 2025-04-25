@@ -3,19 +3,30 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app: Express = express();
-// const whitelist = [
-//   'http://localhost:3000',
-//   'http://localhost:3001',
-//   'http://localhost:3002',
-//   'https://gray-zack-113j.vercel.app',
-//   'https://gray-zack.vercel.app',
-// ];
+const whitelist = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'https://gray-zack-113j.vercel.app',
+  'https://gray-zack.vercel.app',
+  'http://16.171.47.60:3002', // <-- Add your IP here (no trailing slash)
+  'http://16.171.47.60:3001', 
+  'http://16.171.47.60:3000', 
+  'http://16.171.47.60:3003', 
+];
 
 app.use(cors({
-  origin: '*', // Allows all origins
+  origin: function (origin, callback) {
+    if (!origin || whitelist.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   exposedHeaders: ['Content-Type', 'Authorization']
 }));
+
 
 
 
