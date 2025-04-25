@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import Guest from '../models/guest.model';
-import Room from '../models/room.model';
+import Room, { IRoomDocument } from '../models/room.model';
 import RoomService from '../models/RoomService.model';
 import Invoice from '../models/invoice.model';
 import Booking, { BookingStatus } from '../models/booking.model';
@@ -415,6 +415,18 @@ export const processCheckout = async (req: Request, res: Response): Promise<void
       },
       { session }
     );
+
+    // Update room revenue data
+    const roomDoc = await Room.findById(room._id).session(session) as IRoomDocument;
+    if (roomDoc) {
+      roomDoc.addDailyRevenue(
+        new Date(), 
+        roomChargeTotal, 
+        roomServiceTotal + addOnTotal,
+        nightsStayed
+      );
+      await roomDoc.save({ session });
+    }
 
     // Commit the transaction
     await session.commitTransaction();

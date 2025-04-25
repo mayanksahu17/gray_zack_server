@@ -6,6 +6,7 @@ const app: Express = express();
 const whitelist = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:3002',
   'https://gray-zack-113j.vercel.app',
   'https://gray-zack.vercel.app',
 ];
@@ -13,13 +14,14 @@ const whitelist = [
 app.use(cors({
   origin: function (origin, callback) {
     // allow requests with no origin (like mobile apps or curl)
-    if (!origin || whitelist.includes(origin) || true) {
-      callback(null, true); // Allow all origins
+    if (!origin || whitelist.indexOf(origin!) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true); // Allow all origins in development
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  exposedHeaders: ['Content-Type', 'Authorization']
 }));
 
 
@@ -65,6 +67,9 @@ import reservationRoutes from './routes/reservation.route'
 import bookingRoutes from './routes/booking.route'
 import roomServiceRoutes from './routes/roomService.route'
 import checkoutRoutes from './routes/checkout.route'
+import analyticsRoutes from './routes/analytics.route'
+import reportRoutes from './routes/report.route'
+import overviewPaymentRoutes from './routes/overview.payment.route'
 app.use('/api/v1.0/admin',adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
 app.use('/api/v1/staff/hotel', staffRouter)
@@ -78,7 +83,11 @@ app.use('/api/v1/invoice', invoiceRouter)
 app.use('/api/v1/reservation', reservationRoutes)
 app.use('/api/v1/booking', bookingRoutes)
 app.use('/api/v1/room-service', roomServiceRoutes)
+app.use('/api/v1/overview/payments', overviewPaymentRoutes)
 app.use('/api/v1/checkout', checkoutRoutes)
+app.use('/api/v1/analytics', analyticsRoutes)
+app.use('/api/v1/hotel', hotelAdminRouter)
+app.use('/api/v1/reports', reportRoutes)
 
 
 
