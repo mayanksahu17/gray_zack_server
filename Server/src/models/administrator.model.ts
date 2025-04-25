@@ -6,7 +6,8 @@ import jwt, { SignOptions } from "jsonwebtoken";
 enum AdminRole {
   SYSTEM_ADMIN = 'system_admin',
   HOTEL_ADMIN = 'hotel_admin',
-  STAFF_ADMIN = 'staff_admin'
+  STAFF_ADMIN = 'staff_admin',
+  HOTEL_MANAGER = "HOTEL_MANAGER"
 }
 
 enum AdminStatus {

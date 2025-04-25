@@ -156,9 +156,6 @@ export const getBookingsByGuest = async (req: Request, res: Response): Promise<v
   }
 };
 
-
-
-
 export const checkInGuest = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
@@ -474,6 +471,56 @@ export const getAvailableRooms = async (req: Request, res: Response): Promise<vo
     res.status(500).json({
       success: false,
       message: "Failed to fetch available rooms",
+      error: err.message
+    });
+  }
+};
+
+/**
+ * Get daily check-ins and check-outs for a hotel
+ */
+export const getDailyBookings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { hotelId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    // Parse dates or default to today
+    const start = startDate ? new Date(startDate as string) : new Date();
+    start.setHours(0, 0, 0, 0);
+    
+    const end = endDate ? new Date(endDate as string) : new Date(start);
+    end.setHours(23, 59, 59, 999);
+    
+    // Get check-ins for the day
+    const checkIns = await Booking.find({
+      hotelId,
+      checkIn: { $gte: start, $lte: end },
+      status: { $in: [BookingStatus.BOOKED, BookingStatus.CHECKED_IN] }
+    })
+    .populate('roomId', 'roomNumber type')
+    .populate('guestId', 'firstName lastName');
+    
+    // Get check-outs for the day
+    const checkOuts = await Booking.find({
+      hotelId,
+      expectedCheckOut: { $gte: start, $lte: end },
+      status: { $in: [BookingStatus.CHECKED_IN, BookingStatus.CHECKED_OUT] }
+    })
+    .populate('roomId', 'roomNumber type')
+    .populate('guestId', 'firstName lastName');
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        checkIns,
+        checkOuts
+      }
+    });
+  } catch (err: any) {
+    console.error("Error fetching daily bookings:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch daily bookings",
       error: err.message
     });
   }

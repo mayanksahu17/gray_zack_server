@@ -13,7 +13,8 @@ import {
   manageStaff,
   upgradePlan,
   getHotelDetails,
-  getAllHotelStaff
+  getAllHotelStaff,
+  getHotelAlerts
 } from '../controller/hotel.admin.controller';
 
 const router: Router = Router();
@@ -70,6 +71,14 @@ router.get(
   verifyJWT,
   authorizePermission([AdminRole.HOTEL_ADMIN]),
   getHotelRevenue
+);
+
+// Get hotel alerts
+router.get(
+  "/:hotelId/alerts",
+  verifyJWT,
+  authorizePermission([AdminRole.HOTEL_ADMIN, AdminRole.HOTEL_MANAGER]),
+  getHotelAlerts
 );
 
 // Plan Management

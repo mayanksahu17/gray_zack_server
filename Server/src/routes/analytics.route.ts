@@ -1,31 +1,24 @@
-import express from 'express';
-import {
-  getDashboardSummary,
-  getOccupancyByRoomType,
-  getRevenueByRoomType,
-  getDailyOccupancyAndRevenue,
-  getBookingSources,
-  getRevenueOverTime
-} from '../controller/analytics.controller';
+import express from 'express'
+import { 
+  getTodaysTimeline, 
+  getTodayRevenue, 
+  getOccupancyRateToday, 
+  getActiveReservations, 
+  getRoomServiceOrders,
+  getMonthlyRevenue,
+  getMonthlyOccupancy,
+  getSystemAlerts
+} from '../controller/analytics.controller'
 
-const router = express.Router();
+const router = express.Router()
 
-// Dashboard summary data
-router.get('/:hotelId/dashboard', getDashboardSummary);
+router.get('/timeline/today', getTodaysTimeline)
+router.get('/revenue/today', getTodayRevenue)
+router.get('/occupancy-rate/today', getOccupancyRateToday)
+router.get('/active-reservations', getActiveReservations)
+router.get('/room-service-orders', getRoomServiceOrders)
+router.get('/revenue/monthly', getMonthlyRevenue)
+router.get('/occupancy/monthly', getMonthlyOccupancy)
+router.get('/alerts', getSystemAlerts)
 
-// Occupancy by room type
-router.get('/:hotelId/occupancy-by-room-type', getOccupancyByRoomType);
-
-// Revenue by room type
-router.get('/:hotelId/revenue-by-room-type', getRevenueByRoomType);
-
-// Daily occupancy and revenue
-router.get('/:hotelId/daily-metrics', getDailyOccupancyAndRevenue);
-
-// Revenue over time (monthly/weekly trends)
-router.get('/:hotelId/revenue-trends', getRevenueOverTime);
-
-// Booking sources
-router.get('/:hotelId/booking-sources', getBookingSources);
-
-export default router; 
+export default router

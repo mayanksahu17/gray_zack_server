@@ -1,645 +1,466 @@
-import { Request, Response } from 'express';
-import mongoose from 'mongoose';
-import Room from '../models/room.model';
-import Booking, { BookingStatus } from '../models/booking.model';
-import Invoice from '../models/invoice.model';
+import { Request, Response } from 'express'
+import Booking from '../models/booking.model'
+import dayjs from 'dayjs'
+import Invoice from '../models/invoice.model'
+import isBetween from 'dayjs/plugin/isBetween'
+// You may need to import Room if not already globally registered
+import Room from '../models/room.model'
+import RoomService from '../models/RoomService.model'
 
-// Get dashboard summary data
-export const getDashboardSummary = async (req: Request, res: Response) => {
+dayjs.extend(isBetween)
+
+export const getTodaysTimeline = async (req: Request, res: Response) => {
   try {
-    const { hotelId } = req.params;
-    const { startDate, endDate } = req.query;
+    const hotelId = req.query.hotelId as string | undefined
 
-    // Validate dates
-    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
-    const end = endDate ? new Date(endDate as string) : new Date();
+    const startOfDay = dayjs().startOf('day').toDate()
+    const endOfDay = dayjs().endOf('day').toDate()
 
-    // Ensure valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(hotelId)) {
-      return res.status(400).json({ message: 'Invalid hotel ID format' });
-    }
-
-    // Get occupancy data
-    const totalRooms = await Room.countDocuments({ hotelId });
-    const occupiedRooms = await Room.countDocuments({ 
-      hotelId, 
-      status: 'occupied' 
-    });
-    const occupancyRate = totalRooms ? (occupiedRooms / totalRooms) * 100 : 0;
-
-    // Get revenue data
-    const bookings = await Booking.find({
-      hotelId,
+    const filter: any = {
       $or: [
-        { status: BookingStatus.CHECKED_IN },
-        { status: BookingStatus.CHECKED_OUT },
-        {
-          status: BookingStatus.BOOKED,
-          checkIn: { $gte: start, $lte: end }
-        }
+        { actualCheckOut: { $gte: startOfDay, $lte: endOfDay } },
+        { status: 'checked_in', createdAt: { $gte: startOfDay, $lte: endOfDay } }
       ]
-    }).populate('roomId');
+    }
 
-    // Calculate ADR (Average Daily Rate)
-    let totalRevenue = 0;
-    let roomNights = 0;
+    if (hotelId) {
+      filter.hotelId = hotelId
+    }
 
-    bookings.forEach(booking => {
-      const checkIn = new Date(booking.checkIn);
-      const checkOut = booking.actualCheckOut || booking.expectedCheckOut;
-      
-      // Calculate duration in days
-      const durationMs = checkOut.getTime() - checkIn.getTime();
-      const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
-      
-      roomNights += durationDays;
-      totalRevenue += booking.payment.totalAmount;
-    });
+    const bookings = await Booking.find(filter)
+      .populate('guestId', 'personalInfo')
+      .populate('roomId', 'number')
+      .sort({ createdAt: 1, actualCheckOut: 1 })
 
-    const adr = roomNights ? totalRevenue / roomNights : 0;
-    
-    // Calculate RevPAR (Revenue Per Available Room)
-    const revpar = totalRooms ? totalRevenue / totalRooms : 0;
+    const timeline = bookings.flatMap((b) => {
+      const guest = (b.guestId as any)?.personalInfo
+      const room = (b.roomId as any)?.number || 'Unknown'
 
-    // Get today's revenue
+      const entries = []
+
+      if (b.status === 'checked_in' && dayjs(b.createdAt).isBetween(startOfDay, endOfDay, null, '[]')) {
+        entries.push({
+          time: dayjs(b.createdAt).format('hh:mm A'),
+          event: 'Check-in',
+          room,
+          guest: `${guest.firstName} ${guest.lastName}`
+        })
+      }
+
+      if (b.actualCheckOut && dayjs(b.actualCheckOut).isBetween(startOfDay, endOfDay, null, '[]')) {
+        entries.push({
+          time: dayjs(b.actualCheckOut).format('hh:mm A'),
+          event: 'Check-out',
+          room,
+          guest: `${guest.firstName} ${guest.lastName}`
+        })
+      }
+
+      return entries
+    })
+
+    timeline.sort((a, b) => dayjs(a.time, 'hh:mm A').unix() - dayjs(b.time, 'hh:mm A').unix())
+
+    res.status(200).json(timeline)
+  } catch (error) {
+    console.error('[ERROR] Fetching timeline:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+}
+
+export const getTodayRevenue = async (req: Request, res: Response) => {
+  try {
+    const todayStart = dayjs().startOf('day').toDate()
+    const todayEnd = dayjs().endOf('day').toDate()
+
+    const result = await Invoice.aggregate([
+      {
+        $match: {
+          issuedAt: {
+            $gte: todayStart,
+            $lte: todayEnd
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$totalAmount' }
+        }
+      }
+    ])
+
+    const revenueToday = result[0]?.totalRevenue || 0
+
+    res.status(200).json({
+      title: 'Revenue Today',
+      value: `$${revenueToday.toLocaleString()}`,
+      change: '+12%', // Placeholder, dynamic comparison can be added later
+      trend: 'up' // Placeholder too
+    })
+
+    console.log(res.status)
+  } catch (error) {
+    console.error("Error fetching today's revenue:", error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+}
+
+export const getOccupancyRateToday = async (req: Request, res: Response) => {
+  try {
+    const { hotelId } = req.query;
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const todayInvoices = await Invoice.find({
-      issuedAt: { $gte: today, $lt: tomorrow }
-    });
-
-    const todayRevenue = todayInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-
-    return res.status(200).json({
-      occupancyRate,
-      totalRooms,
-      occupiedRooms,
-      adr,
-      revpar,
-      totalRevenue,
-      todayRevenue
-    });
-  } catch (error) {
-    console.error('Error fetching dashboard summary:', error);
-    return res.status(500).json({ message: 'Failed to fetch dashboard summary' });
-  }
-};
-
-// Get occupancy breakdown by room type
-export const getOccupancyByRoomType = async (req: Request, res: Response) => {
-  try {
-    const { hotelId } = req.params;
     
-    // Ensure valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(hotelId)) {
-      return res.status(400).json({ message: 'Invalid hotel ID format' });
-    }
+    // Fix the handling of dates to avoid modifying the same date object
+    const startDate = dayjs().startOf('day').toDate();
+    const endDate = dayjs().endOf('day').toDate();
 
-    const roomTypes = await Room.aggregate([
-      { $match: { hotelId: new mongoose.Types.ObjectId(hotelId) } },
-      { $group: {
-        _id: '$type',
-        totalRooms: { $sum: 1 },
-        occupiedRooms: { 
-          $sum: { 
-            $cond: [{ $eq: ['$status', 'occupied'] }, 1, 0] 
-          }
-        }
-      }},
-      { $project: {
-        roomType: '$_id',
-        totalRooms: 1,
-        occupiedRooms: 1,
-        occupancyRate: { 
-          $multiply: [
-            { $divide: ['$occupiedRooms', '$totalRooms'] },
-            100
-          ]
-        }
-      }},
-      { $sort: { roomType: 1 } }
-    ]);
-
-    return res.status(200).json(roomTypes);
-  } catch (error) {
-    console.error('Error fetching occupancy by room type:', error);
-    return res.status(500).json({ message: 'Failed to fetch occupancy data' });
-  }
-};
-
-// Get revenue breakdown by room type
-export const getRevenueByRoomType = async (req: Request, res: Response) => {
-  try {
-    const { hotelId } = req.params;
-    const { startDate, endDate } = req.query;
-    
-    // Validate dates
-    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-    
-    // Ensure valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(hotelId)) {
-      return res.status(400).json({ message: 'Invalid hotel ID format' });
-    }
-
-    // Get all rooms for this hotel
-    const rooms = await Room.find({ hotelId });
-    
-    // Create map to store revenue by room type
-    const revenueByType: {
-      [key: string]: {
-        roomType: string;
-        roomRevenue: number;
-        fbRevenue: number;
-        otherRevenue: number;
-        totalRevenue: number;
-        count: number;
-      }
-    } = {};
-
-    // Initialize with all room types
-    const uniqueRoomTypes = [...new Set(rooms.map(room => room.type))];
-    uniqueRoomTypes.forEach(type => {
-      revenueByType[type] = {
-        roomType: type,
-        roomRevenue: 0,
-        fbRevenue: 0,
-        otherRevenue: 0,
-        totalRevenue: 0,
-        count: 0
-      };
-    });
-
-    // Process revenue from room.revenueHistory
-    rooms.forEach(room => {
-      // Filter revenue history entries within date range
-      const relevantHistory = room.revenueHistory.filter(entry => {
-        return entry.date >= start && entry.date <= end;
-      });
-
-      if (relevantHistory.length > 0) {
-        const roomType = room.type;
-        const typeData = revenueByType[roomType];
-        
-        // Assume 60% of additionalRevenue is F&B and 40% is other
-        const fbRevenuePercent = 0.6;
-        const otherRevenuePercent = 0.4;
-        
-        // Sum up revenue from this room
-        relevantHistory.forEach(entry => {
-          typeData.roomRevenue += entry.roomRevenue;
-          typeData.fbRevenue += entry.additionalRevenue * fbRevenuePercent;
-          typeData.otherRevenue += entry.additionalRevenue * otherRevenuePercent;
-          typeData.totalRevenue += entry.roomRevenue + entry.additionalRevenue;
-          typeData.count += entry.occupiedNights;
-        });
-      }
-    });
-
-    // Convert the map to an array for response
-    const result = Object.values(revenueByType).filter(item => item.totalRevenue > 0);
-
-    // If no revenue data from revenueHistory, fall back to invoice-based calculation
-    if (result.length === 0) {
-      const revenueByRoomType = await Booking.aggregate([
-        { 
-          $match: { 
-            hotelId: new mongoose.Types.ObjectId(hotelId),
-            checkIn: { $gte: start, $lte: end },
-            status: { $in: [BookingStatus.CHECKED_IN, BookingStatus.CHECKED_OUT] }
-          } 
-        },
-        {
-          $lookup: {
-            from: 'rooms',
-            localField: 'roomId',
-            foreignField: '_id',
-            as: 'room'
-          }
-        },
-        { $unwind: '$room' },
-        {
-          $lookup: {
-            from: 'invoices',
-            localField: '_id',
-            foreignField: 'bookingId',
-            as: 'invoice'
-          }
-        },
-        { 
-          $unwind: { 
-            path: '$invoice',
-            preserveNullAndEmptyArrays: true
-          }
-        },
-        {
-          $group: {
-            _id: '$room.type',
-            roomRevenue: {
-              $sum: {
-                $reduce: {
-                  input: {
-                    $filter: {
-                      input: '$invoice.lineItems',
-                      as: 'item',
-                      cond: { $eq: ['$$item.type', 'room_charge'] }
-                    }
-                  },
-                  initialValue: 0,
-                  in: { $add: ['$$value', '$$this.amount'] }
-                }
-              }
-            },
-            fbRevenue: {
-              $sum: {
-                $reduce: {
-                  input: {
-                    $filter: {
-                      input: '$invoice.lineItems',
-                      as: 'item',
-                      cond: { $eq: ['$$item.type', 'room_service'] }
-                    }
-                  },
-                  initialValue: 0,
-                  in: { $add: ['$$value', '$$this.amount'] }
-                }
-              }
-            },
-            otherRevenue: {
-              $sum: {
-                $reduce: {
-                  input: {
-                    $filter: {
-                      input: '$invoice.lineItems',
-                      as: 'item',
-                      cond: { 
-                        $and: [
-                          { $ne: ['$$item.type', 'room_charge'] },
-                          { $ne: ['$$item.type', 'room_service'] },
-                          { $ne: ['$$item.type', 'tax'] }
-                        ]
-                      }
-                    }
-                  },
-                  initialValue: 0,
-                  in: { $add: ['$$value', '$$this.amount'] }
-                }
-              }
-            },
-            totalRevenue: { $sum: '$invoice.totalAmount' },
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $project: {
-            roomType: '$_id',
-            roomRevenue: 1,
-            fbRevenue: 1,
-            otherRevenue: 1,
-            totalRevenue: 1,
-            count: 1
-          }
-        },
-        { $sort: { roomType: 1 } }
-      ]);
-
-      return res.status(200).json(revenueByRoomType);
-    }
-
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error('Error fetching revenue by room type:', error);
-    return res.status(500).json({ message: 'Failed to fetch revenue data' });
-  }
-};
-
-// Get daily occupancy and revenue
-export const getDailyOccupancyAndRevenue = async (req: Request, res: Response) => {
-  try {
-    const { hotelId } = req.params;
-    const { startDate, endDate } = req.query;
-    
-    // Validate dates
-    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
-    
-    // Ensure valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(hotelId)) {
-      return res.status(400).json({ message: 'Invalid hotel ID format' });
-    }
-
-    // Helper function to generate date range
-    const getDates = (startDate: Date, endDate: Date) => {
-      const dates = [];
-      let currentDate = new Date(startDate);
-      
-      while (currentDate <= endDate) {
-        dates.push(new Date(currentDate));
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-      
-      return dates;
+    // Find active bookings for today
+    const filter: any = {
+      status: { $in: ['booked', 'checked_in'] },
+      checkIn: { $lte: endDate },
+      $or: [
+        { actualCheckOut: { $gt: startDate } },
+        { expectedCheckOut: { $gte: startDate }, actualCheckOut: null }
+      ]
     };
 
-    const dateRange = getDates(start, end);
-    const totalRooms = await Room.countDocuments({ hotelId });
+    if (hotelId) {
+      filter.hotelId = hotelId;
+    }
 
-    // Get all rooms for this hotel
-    const rooms = await Room.find({ hotelId });
+    // Count active bookings
+    const activeBookings = await Booking.countDocuments(filter);
 
-    // Prepare result container
-    const result = await Promise.all(dateRange.map(async (date) => {
-      const nextDay = new Date(date);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
-      // Get occupancy for the day
-      const occupiedRoomsCount = await Booking.countDocuments({
-        hotelId,
-        checkIn: { $lte: date },
-        $or: [
-          { actualCheckOut: { $gte: nextDay } },
-          { expectedCheckOut: { $gte: nextDay }, actualCheckOut: null }
-        ],
-        status: { $in: [BookingStatus.CHECKED_IN, BookingStatus.CHECKED_OUT] }
+    // Get total available rooms
+    const rooms = await Room.countDocuments(hotelId ? { hotelId } : {});
+
+    if (rooms === 0) {
+      return res.status(200).json({
+        title: 'Occupancy Rate',
+        value: '0%',
+        change: "+5%",
+        trend: "up"
       });
-      
-      const occupancyRate = totalRooms ? (occupiedRoomsCount / totalRooms) * 100 : 0;
-      
-      // Format date for comparison
-      const normalizedDate = new Date(date);
-      normalizedDate.setHours(0, 0, 0, 0);
-      
-      // Calculate revenue from room.revenueHistory
-      let totalRoomRevenue = 0;
-      let totalAdditionalRevenue = 0;
-      let totalOccupiedNights = 0;
-      
-      // Aggregate revenue data from each room's revenue history
-      rooms.forEach(room => {
-        const revenueEntry = room.revenueHistory.find(
-          entry => entry.date.getTime() === normalizedDate.getTime()
-        );
-        
-        if (revenueEntry) {
-          totalRoomRevenue += revenueEntry.roomRevenue;
-          totalAdditionalRevenue += revenueEntry.additionalRevenue;
-          totalOccupiedNights += revenueEntry.occupiedNights;
-        }
-      });
-      
-      const totalRevenue = totalRoomRevenue + totalAdditionalRevenue;
-      
-      // Calculate ADR (if there were occupied rooms)
-      const adr = totalOccupiedNights > 0 ? totalRevenue / totalOccupiedNights : 0;
-      
-      // Fallback to invoice data if no revenue history found
-      if (totalRevenue === 0) {
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        const invoices = await Invoice.find({
-          issuedAt: { $gte: dayStart, $lte: dayEnd }
-        });
-        
-        const invoiceRevenue = invoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-        
-        return {
-          date: date.toISOString().split('T')[0],
-          occupancyRate,
-          adr: occupiedRoomsCount ? invoiceRevenue / occupiedRoomsCount : 0,
-          revenue: invoiceRevenue,
-          roomRevenue: 0,  // We don't know the breakdown from invoices
-          additionalRevenue: 0,
-          source: 'invoices'
-        };
-      }
-      
-      return {
-        date: date.toISOString().split('T')[0],
-        occupancyRate,
-        adr,
-        revenue: totalRevenue,
-        roomRevenue: totalRoomRevenue,
-        additionalRevenue: totalAdditionalRevenue,
-        occupiedNights: totalOccupiedNights,
-        source: 'revenueHistory'
-      };
-    }));
+    }
 
-    return res.status(200).json(result);
+    // Calculate occupancy rate
+    const occupancyRate = (activeBookings / rooms) * 100;
+
+    res.status(200).json({
+      title: 'Occupancy Rate',
+      value: `${occupancyRate.toFixed(2)}%`,
+      change: "+5%",  
+      trend: "up"     
+    });
   } catch (error) {
-    console.error('Error fetching daily data:', error);
-    return res.status(500).json({ message: 'Failed to fetch daily data' });
+    console.error('Error calculating occupancy rate:', error);
+    res.status(500).json({ message: 'Error calculating occupancy rate' });
   }
 };
 
-// Get booking sources data
-export const getBookingSources = async (req: Request, res: Response) => {
+export const getActiveReservations = async (req: Request, res: Response) => {
   try {
-    const { hotelId } = req.params;
-    const { startDate, endDate } = req.query;
+    const { hotelId } = req.query;
+    const today = dayjs();
+    const lastWeek = today.subtract(7, 'day');
     
-    // Validate dates
-    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate as string) : new Date();
+    // Current period
+    const filter: any = {
+      status: { $in: ['booked', 'checked_in'] }
+    };
     
-    // This would require a field in the booking model to track booking source
-    // For now, we'll return mock data
+    if (hotelId) {
+      filter.hotelId = hotelId;
+    }
     
-    return res.status(200).json([
-      { source: 'Direct', count: 45, percentage: 45 },
-      { source: 'Booking.com', count: 25, percentage: 25 },
-      { source: 'Expedia', count: 15, percentage: 15 },
-      { source: 'Airbnb', count: 10, percentage: 10 },
-      { source: 'Other', count: 5, percentage: 5 }
+    const activeReservations = await Booking.countDocuments(filter);
+    
+    // Last week's period for comparison
+    const lastWeekFilter = {
+      ...filter,
+      createdAt: { $lte: lastWeek.endOf('day').toDate() }
+    };
+    
+    const lastWeekReservations = await Booking.countDocuments(lastWeekFilter);
+    
+    // Calculate change percentage
+    let changePercent = 0;
+    let trend: 'up' | 'down' | 'flat' = 'flat';
+    
+    if (lastWeekReservations > 0) {
+      changePercent = ((activeReservations - lastWeekReservations) / lastWeekReservations) * 100;
+      trend = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
+    }
+    
+    res.status(200).json({
+      title: 'Active Reservations',
+      value: activeReservations.toString(),
+      change: `${Math.abs(changePercent).toFixed(0)}%`,
+      trend
+    });
+  } catch (error) {
+    console.error('Error fetching active reservations:', error);
+    res.status(500).json({ message: 'Error fetching active reservations' });
+  }
+};
+
+export const getRoomServiceOrders = async (req: Request, res: Response) => {
+  try {
+    const { hotelId } = req.query;
+    const today = dayjs();
+    const startOfDay = today.startOf('day').toDate();
+    const endOfDay = today.endOf('day').toDate();
+    const lastWeek = today.subtract(7, 'day');
+    const lastWeekStart = lastWeek.startOf('day').toDate();
+    const lastWeekEnd = lastWeek.endOf('day').toDate();
+    
+    // Current day's orders
+    const filter: any = {
+      createdAt: { 
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    };
+    
+    if (hotelId) {
+      filter.hotelId = hotelId;
+    }
+    
+    const todayOrders = await RoomService.countDocuments(filter);
+    
+    // Last week's same day for comparison
+    const lastWeekFilter = {
+      ...filter,
+      createdAt: { 
+        $gte: lastWeekStart,
+        $lte: lastWeekEnd
+      }
+    };
+    
+    const lastWeekOrders = await RoomService.countDocuments(lastWeekFilter);
+    
+    // Calculate change percentage
+    let changePercent = 0;
+    let trend: 'up' | 'down' | 'flat' = 'flat';
+    
+    if (lastWeekOrders > 0) {
+      changePercent = ((todayOrders - lastWeekOrders) / lastWeekOrders) * 100;
+      trend = changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'flat';
+    } else if (todayOrders > 0) {
+      // If last week was 0 but today has orders, show 100% increase
+      changePercent = 100;
+      trend = 'up';
+    }
+    
+    res.status(200).json({
+      title: 'Room Service Orders',
+      value: todayOrders.toString(),
+      change: `${Math.abs(changePercent).toFixed(0)}%`,
+      trend
+    });
+  } catch (error) {
+    console.error('Error fetching room service orders:', error);
+    res.status(500).json({ message: 'Error fetching room service orders' });
+  }
+};
+
+export const getMonthlyRevenue = async (req: Request, res: Response) => {
+  try {
+    const { year } = req.query;
+    // Default to current year if not specified
+    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+    
+    // Create startDate and endDate for the target year
+    const startDate = new Date(targetYear, 0, 1); // January 1st of target year
+    const endDate = new Date(targetYear, 11, 31, 23, 59, 59, 999); // December 31st of target year
+    
+    // Aggregate monthly revenue
+    const monthlyRevenue = await Invoice.aggregate([
+      {
+        $match: {
+          issuedAt: {
+            $gte: startDate,
+            $lte: endDate
+          }
+        }
+      },
+      {
+        $group: {
+          _id: { $month: "$issuedAt" },
+          revenue: { $sum: "$totalAmount" }
+        }
+      },
+      {
+        $sort: { _id: 1 }
+      }
     ]);
-  } catch (error) {
-    console.error('Error fetching booking sources:', error);
-    return res.status(500).json({ message: 'Failed to fetch booking sources' });
-  }
-};
-
-// Get revenue trends over time (monthly or weekly)
-export const getRevenueOverTime = async (req: Request, res: Response) => {
-  try {
-    const { hotelId } = req.params;
-    const { startDate, endDate, groupBy = 'month' } = req.query;
     
-    // Validate dates
-    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000); // Default to last year
-    const end = endDate ? new Date(endDate as string) : new Date();
+    // Convert the month numbers to month names and format the result
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     
-    // Ensure valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(hotelId)) {
-      return res.status(400).json({ message: 'Invalid hotel ID format' });
-    }
-
-    // Get all rooms for the hotel
-    const rooms = await Room.find({ hotelId });
-
-    // Prepare result map for aggregation
-    const revenueMap: {
-      [key: string]: {
-        period: string;
-        roomRevenue: number;
-        additionalRevenue: number;
-        totalRevenue: number;
-        occupiedNights: number;
-        adr: number;
+    // Initialize with all months at 0 revenue
+    const formattedData = months.map((month, index) => ({
+      date: month,
+      revenue: 0
+    }));
+    
+    // Fill in actual revenue data where it exists
+    monthlyRevenue.forEach(item => {
+      const monthIndex = item._id - 1; // MongoDB months are 1-indexed
+      if (monthIndex >= 0 && monthIndex < 12) {
+        formattedData[monthIndex].revenue = item.revenue;
       }
-    } = {};
-
-    // Process each room's revenue history
-    rooms.forEach(room => {
-      // Filter revenue entries within the date range
-      const relevantHistory = room.revenueHistory.filter(entry => 
-        entry.date >= start && entry.date <= end
-      );
-
-      // Process each entry
-      relevantHistory.forEach(entry => {
-        const date = new Date(entry.date);
-        let periodKey: string;
-        
-        if (groupBy === 'week') {
-          // Get the week of year
-          const weekNumber = getWeekNumber(date);
-          const year = date.getFullYear();
-          periodKey = `${year}-W${weekNumber.toString().padStart(2, '0')}`;
-        } else {
-          // Default to monthly
-          const year = date.getFullYear();
-          const month = date.getMonth() + 1; // Months are 0-indexed
-          periodKey = `${year}-${month.toString().padStart(2, '0')}`;
-        }
-
-        // Initialize period if needed
-        if (!revenueMap[periodKey]) {
-          revenueMap[periodKey] = {
-            period: periodKey,
-            roomRevenue: 0,
-            additionalRevenue: 0,
-            totalRevenue: 0,
-            occupiedNights: 0,
-            adr: 0
-          };
-        }
-
-        // Add data to the period
-        revenueMap[periodKey].roomRevenue += entry.roomRevenue;
-        revenueMap[periodKey].additionalRevenue += entry.additionalRevenue;
-        revenueMap[periodKey].totalRevenue += (entry.roomRevenue + entry.additionalRevenue);
-        revenueMap[periodKey].occupiedNights += entry.occupiedNights;
-      });
     });
-
-    // Calculate ADR for each period
-    Object.values(revenueMap).forEach(period => {
-      period.adr = period.occupiedNights > 0 
-        ? period.totalRevenue / period.occupiedNights 
-        : 0;
-    });
-
-    // Convert to array and sort by period
-    const result = Object.values(revenueMap).sort((a, b) => 
-      a.period.localeCompare(b.period)
-    );
-
-    // If no data from revenue history, fall back to invoice-based calculation
-    if (result.length === 0) {
-      const invoiceData = await Invoice.aggregate([
-        {
-          $match: {
-            issuedAt: { $gte: start, $lte: end }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              $cond: [
-                { $eq: [groupBy, 'week'] },
-                {
-                  year: { $year: '$issuedAt' },
-                  week: { $week: '$issuedAt' }
-                },
-                {
-                  year: { $year: '$issuedAt' },
-                  month: { $month: '$issuedAt' }
-                }
-              ]
-            },
-            totalRevenue: { $sum: '$totalAmount' },
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $project: {
-            period: {
-              $cond: [
-                { $eq: [groupBy, 'week'] },
-                {
-                  $concat: [
-                    { $toString: '$_id.year' },
-                    '-W',
-                    {
-                      $cond: [
-                        { $lt: ['$_id.week', 10] },
-                        { $concat: ['0', { $toString: '$_id.week' }] },
-                        { $toString: '$_id.week' }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  $concat: [
-                    { $toString: '$_id.year' },
-                    '-',
-                    {
-                      $cond: [
-                        { $lt: ['$_id.month', 10] },
-                        { $concat: ['0', { $toString: '$_id.month' }] },
-                        { $toString: '$_id.month' }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            totalRevenue: 1,
-            count: 1
-          }
-        },
-        { $sort: { period: 1 } }
-      ]);
-
-      return res.status(200).json(invoiceData.map(item => ({
-        period: item.period,
-        roomRevenue: item.totalRevenue * 0.75, // Estimate
-        additionalRevenue: item.totalRevenue * 0.25, // Estimate
-        totalRevenue: item.totalRevenue,
-        occupiedNights: item.count, // Estimate based on invoice count
-        adr: item.count > 0 ? (item.totalRevenue * 0.75) / item.count : 0
-      })));
-    }
-
-    return res.status(200).json(result);
+    
+    res.status(200).json(formattedData);
   } catch (error) {
-    console.error('Error fetching revenue over time:', error);
-    return res.status(500).json({ message: 'Failed to fetch revenue trend data' });
+    console.error("Error fetching monthly revenue:", error);
+    res.status(500).json({ message: "Error fetching monthly revenue" });
   }
 };
 
-// Helper function to get week number
-function getWeekNumber(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+export const getMonthlyOccupancy = async (req: Request, res: Response) => {
+  try {
+    const { year, hotelId } = req.query;
+    // Default to current year if not specified
+    const targetYear = year ? parseInt(year as string) : new Date().getFullYear();
+    
+    // Initialize result array with all months
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const formattedData = months.map((month, index) => ({
+      date: month,
+      occupancy: 0
+    }));
+    
+    // For each month, we'll need to calculate occupancy rate
+    for (let month = 0; month < 12; month++) {
+      const startOfMonth = new Date(targetYear, month, 1);
+      const endOfMonth = new Date(targetYear, month + 1, 0, 23, 59, 59, 999);
+      const daysInMonth = endOfMonth.getDate();
+      
+      // Count total rooms available for the hotel
+      const filter = hotelId ? { hotelId } : {};
+      const totalRooms = await Room.countDocuments(filter);
+      
+      if (totalRooms === 0) {
+        continue; // Skip if no rooms exist
+      }
+      
+      // Get all bookings active during this month
+      const bookingFilter: any = {
+        checkIn: { $lte: endOfMonth },
+        $or: [
+          { actualCheckOut: { $gte: startOfMonth } },
+          { expectedCheckOut: { $gte: startOfMonth }, actualCheckOut: null }
+        ],
+        status: { $in: ['booked', 'checked_in', 'checked_out'] }
+      };
+      
+      if (hotelId) {
+        bookingFilter.hotelId = hotelId;
+      }
+      
+      const bookings = await Booking.find(bookingFilter);
+      
+      // Calculate room-nights booked
+      let occupiedRoomNights = 0;
+      
+      bookings.forEach(booking => {
+        // Determine overlap with month
+        const bookingStart = dayjs(booking.checkIn).isAfter(dayjs(startOfMonth)) 
+          ? booking.checkIn 
+          : startOfMonth;
+          
+        const bookingEnd = booking.actualCheckOut 
+          ? (dayjs(booking.actualCheckOut).isBefore(dayjs(endOfMonth)) 
+              ? booking.actualCheckOut 
+              : endOfMonth)
+          : (dayjs(booking.expectedCheckOut).isBefore(dayjs(endOfMonth)) 
+              ? booking.expectedCheckOut 
+              : endOfMonth);
+        
+        // Calculate number of nights (including partial days)
+        const nights = Math.ceil(dayjs(bookingEnd).diff(dayjs(bookingStart), 'day', true));
+        occupiedRoomNights += Math.max(0, nights); // Ensure no negative nights
+      });
+      
+      // Calculate occupancy rate (room-nights booked / total room-nights available)
+      const totalRoomNights = totalRooms * daysInMonth;
+      const occupancyRate = (occupiedRoomNights / totalRoomNights) * 100;
+      
+      // Add to result
+      formattedData[month].occupancy = Math.round(occupancyRate);
+    }
+    
+    res.status(200).json(formattedData);
+  } catch (error) {
+    console.error("Error calculating monthly occupancy:", error);
+    res.status(500).json({ message: "Error calculating monthly occupancy" });
+  }
+};
+
+export const getSystemAlerts = async (req: Request, res: Response) => {
+  try {
+    const { hotelId } = req.query;
+    const timeframe = parseInt((req.query.timeframe as string) || '24');
+    
+    // Get a timestamp from X hours ago (default 24 hours)
+    const cutoffTime = dayjs().subtract(timeframe, 'hour').toDate();
+    
+    // Mock data structure - in a real system this would come from a database
+    // You would replace this with actual alerts from your database
+    const alertTypes = {
+      success: [
+        { message: "All systems operational", time: dayjs().subtract(1, 'minute').toDate() },
+      ],
+      warning: [
+        { message: "Room maintenance scheduled", time: dayjs().subtract(10, 'minute').toDate() },
+        { message: "Low inventory on bathroom supplies", time: dayjs().subtract(3, 'hour').toDate() },
+      ],
+      error: [
+        { message: "Overbooking detected", time: dayjs().subtract(1, 'hour').toDate() },
+        { message: "Payment processing system issue", time: dayjs().subtract(5, 'hour').toDate() },
+      ]
+    };
+    
+    // Format the alerts
+    const allAlerts = [
+      ...alertTypes.success.map(alert => ({ ...alert, type: "success" })),
+      ...alertTypes.warning.map(alert => ({ ...alert, type: "warning" })),
+      ...alertTypes.error.map(alert => ({ ...alert, type: "error" }))
+    ];
+    
+    // Filter by cutoff time
+    const recentAlerts = allAlerts
+      .filter(alert => alert.time >= cutoffTime)
+      .map(alert => ({
+        ...alert,
+        time: formatAlertTime(alert.time)
+      }))
+      .sort((a, b) => dayjs(b.time).unix() - dayjs(a.time).unix());
+    
+    res.status(200).json(recentAlerts);
+  } catch (error) {
+    console.error("Error fetching system alerts:", error);
+    res.status(500).json({ message: "Error fetching system alerts" });
+  }
+};
+
+// Helper function to format alert times in a user-friendly way
+function formatAlertTime(date: Date): string {
+  const now = dayjs();
+  const alertTime = dayjs(date);
+  const diffMinutes = now.diff(alertTime, 'minute');
+  
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  
+  const diffHours = now.diff(alertTime, 'hour');
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  
+  const diffDays = now.diff(alertTime, 'day');
+  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 }
+
+
