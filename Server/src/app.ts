@@ -70,6 +70,8 @@ import checkoutRoutes from './routes/checkout.route'
 import analyticsRoutes from './routes/analytics.route'
 import reportRoutes from './routes/report.route'
 import overviewPaymentRoutes from './routes/overview.payment.route'
+// import authRouter from './routes/auth.route' 
+
 app.use('/api/v1.0/admin',adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
 app.use('/api/v1/staff/hotel', staffRouter)
@@ -88,8 +90,7 @@ app.use('/api/v1/checkout', checkoutRoutes)
 app.use('/api/v1/analytics', analyticsRoutes)
 app.use('/api/v1/hotel', hotelAdminRouter)
 app.use('/api/v1/reports', reportRoutes)
-
-
+// app.use('/api/v1/auth',authRouter)
 
 
 

@@ -51,7 +51,7 @@ export default function RestaurantTables() {
   const fetchTables = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
+      const response = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
       const data = await response.json()
 
       if (data.success) {
@@ -79,7 +79,7 @@ export default function RestaurantTables() {
   // Add new table
   const handleAddTable = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`, {
+      const response = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ export default function RestaurantTables() {
   // Delete table
   const handleDeleteTable = async (tableNumber: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableNumber}`, {
+      const response = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableNumber}`, {
         method: 'DELETE',
       })
       const data = await response.json()
@@ -143,7 +143,7 @@ export default function RestaurantTables() {
   // Update table status
   const updateTableStatus = async (tableId: string, newStatus: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableId}/status`, {
+      const response = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

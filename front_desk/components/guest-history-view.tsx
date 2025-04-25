@@ -21,7 +21,7 @@ export function GuestHistoryView() {
   const [guestNotes, setGuestNotes] = useState<any[]>([])
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/guest/hotel/60d21b4667d0d8992e610c85")
+    fetch("http://16.171.47.60:8000/api/v1/guest/hotel/60d21b4667d0d8992e610c85")
       .then((res) => res.json())
       .then((data) => setGuests(data))
       .catch((err) => console.error("Error fetching guest data", err))
@@ -31,7 +31,7 @@ export function GuestHistoryView() {
   useEffect(() => {
     if (selectedGuest?._id) {
       // Fetch booking history
-      fetch(`http://localhost:8000/api/v1/booking/guest/${selectedGuest._id}`)
+      fetch(`http://16.171.47.60:8000/api/v1/booking/guest/${selectedGuest._id}`)
         .then((res) => res.json())
         .then((data) => {
           // Transform booking data to match the stay history format
