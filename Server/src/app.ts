@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app: Express = express();
+
 const whitelist = [
   'http://16.171.47.60:3000/',
   'http://16.171.47.60:3001/',
@@ -25,7 +26,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
 
 
 app.use(express.json({ limit: "16kb" }));
@@ -93,22 +93,6 @@ app.use('/api/v1/analytics', analyticsRoutes)
 app.use('/api/v1/hotel', hotelAdminRouter)
 app.use('/api/v1/reports', reportRoutes)
 // app.use('/api/v1/auth',authRouter)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
