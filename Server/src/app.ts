@@ -3,29 +3,31 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app: Express = express();
-
 const whitelist = [
-  'http://16.171.47.60:3000/',
-  'http://16.171.47.60:3001/',
-  'http://16.171.47.60:3002/',
-  "http://16.171.47.60:3003/",
-  'https://gray-zack-113j.vercel.app',
-  'https://gray-zack.vercel.app'
-];
+    'http://16.171.47.60:3000',
+    'http://16.171.47.60:3001',
+    'http://16.171.47.60:3002',
+    "http://16.171.47.60:3003",
+    'https://gray-zack-113j.vercel.app',
+    'https://gray-zack.vercel.app'
+  ];
+  
 
-const corsOptions = {
-  origin: function (origin : any, callback : any) {
-    if (!origin || whitelist.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  exposedHeaders: ['Content-Type', 'Authorization']
-};
-
-app.use(cors(corsOptions));
+  const corsOptions = {
+    origin: function (origin : any, callback : any) {
+      if (!origin || whitelist.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    exposedHeaders: ['Content-Type', 'Authorization']
+  };
+  
+  app.use(cors(corsOptions));
+  
+  
 
 
 app.use(express.json({ limit: "16kb" }));

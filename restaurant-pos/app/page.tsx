@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
+import logo from "../public/logo.png"
 
 
 export default function LoginPage() {
@@ -156,14 +156,14 @@ else if (AuthUtils.hasRole('front_desk')) {
         <CardHeader className="space-y-4 items-center">
           <div className="w-48 h-16 relative mb-2">
             <Image
-              src="https://lodgezify.com/assets/images/site_logo/is_logo1.png"
+              src={logo}
               alt="Hotel POS Logo"
               fill
               className="object-contain"
               priority
             />
           </div>
-          <CardTitle className="text-2xl font-semibold text-blue-800">Hotel Management POS</CardTitle>
+          <CardTitle className="text-2xl font-semibold text-blue-800">Hotel Management</CardTitle>
           <CardDescription className="text-blue-600">Sign in to access your dashboard</CardDescription>
         </CardHeader>
         <CardContent>
