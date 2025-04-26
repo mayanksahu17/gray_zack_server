@@ -4,25 +4,27 @@ import cors from 'cors';
 
 const app: Express = express();
 const whitelist = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
+  'http://16.171.47.60:3000/',
+  'http://16.171.47.60:3001/',
+  'http://16.171.47.60:3002/',
+  "http://16.171.47.60:3003/",
   'https://gray-zack-113j.vercel.app',
-  'https://gray-zack.vercel.app',
+  'https://gray-zack.vercel.app'
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl)
-    if (!origin || whitelist.indexOf(origin!) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true); // Allow all origins in development
+const corsOptions = {
+  origin: function (origin : any, callback : any) {
+    if (!origin || whitelist.includes(origin)) {
+      callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   exposedHeaders: ['Content-Type', 'Authorization']
-}));
+};
+
+app.use(cors(corsOptions));
 
 
 
