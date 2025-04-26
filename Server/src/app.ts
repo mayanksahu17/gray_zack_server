@@ -3,20 +3,29 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app: Express = express();
-// const whitelist = [
-//   'http://localhost:3000',
-//   'http://localhost:3001',
-//   'http://localhost:3002',
-//   'https://gray-zack-113j.vercel.app',
-//   'https://gray-zack.vercel.app',
-// ];
 
-app.use(cors({  
-  origin: '*', // Allows all origins
+const whitelist = [
+  'http://16.171.47.60:3000/',
+  'http://16.171.47.60:3001/',
+  'http://16.171.47.60:3002/',
+  "http://16.171.47.60:3003/",
+  'https://gray-zack-113j.vercel.app',
+  'https://gray-zack.vercel.app'
+];
+
+const corsOptions = {
+  origin: function (origin : any, callback : any) {
+    if (!origin || whitelist.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   exposedHeaders: ['Content-Type', 'Authorization']
-}));
+};
 
+app.use(cors(corsOptions));
 
 
 app.use(express.json({ limit: "16kb" }));
@@ -84,22 +93,6 @@ app.use('/api/v1/analytics', analyticsRoutes)
 app.use('/api/v1/hotel', hotelAdminRouter)
 app.use('/api/v1/reports', reportRoutes)
 // app.use('/api/v1/auth',authRouter)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
