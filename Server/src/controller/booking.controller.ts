@@ -37,6 +37,7 @@ export  const  saveDraftCheckIn = async (req: any, res: any) => {
       // Find all bookings for this guest and populate room details
       const bookings = await Booking.find({ guestId })
         .populate('roomId', 'roomNumber type') // Populate room details
+        .populate('guestId', 'personalInfo') // Populate guest personal info
         .sort({ checkIn: -1 }); // Sort by check-in date, most recent first
       
       // Transform the bookings to include room details

@@ -14,7 +14,7 @@ router.get(
 // Create room service charge
 router.post(
   '/charge',
-  verifyJWT,
+  // verifyJWT,
   roomServiceController.createRoomServiceCharge
 )
 

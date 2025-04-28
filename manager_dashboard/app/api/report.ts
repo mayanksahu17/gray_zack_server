@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE = 'http://16.171.47.60:8000/api/v1/reports'
+const API_BASE = 'http://localhost:8000/api/v1/reports'
 
 export const getOccupancyTrend = async (year?: number, hotelId?: string) => {
   const response = await axios.get(`${API_BASE}/occupancy-trend`, {
