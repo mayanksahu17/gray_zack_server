@@ -21,7 +21,25 @@ import {
 } from "@/components/ui/select"
 import { log } from "node:console"
 
-  // Function to fetch restaurant data and return the menu
+interface MenuItem {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  isVegetarian: boolean;
+  spicyLevel: number;
+  image?: string;
+}
+
+interface CartItem extends MenuItem {
+  size: string;
+  addons: string[];
+  cookingPreference: string;
+  specialInstructions: string;
+  quantity: number;
+}
+
+// Function to fetch restaurant data and return the menu
 // Async function to fetch restaurant data and return menu
 const getRestaurentData = async () => {
   try {
@@ -71,11 +89,11 @@ async function addMenuToRestaurant(restaurantId: string, menuData: any) {
 export default function NewOrder({ onCheckout }: any) {
   const [menuCategories, setMenuCategories] = useState<any[]>([])
   const [activeCategory, setActiveCategory] = useState<string>("")
-  const [cart, setCart] = useState([])
-  const [customizeItem, setCustomizeItem] = useState(null)
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [customizeItem, setCustomizeItem] = useState<MenuItem | null>(null)
   const [customizations, setCustomizations] = useState({
     size: "medium",
-    addons: [],
+    addons: [] as string[],
     cookingPreference: "",
     specialInstructions: "",
     quantity: 1,
@@ -181,7 +199,9 @@ export default function NewOrder({ onCheckout }: any) {
 
   // Handle confirming item customization
   const confirmCustomization = () => {
-    const customizedItem  = {
+    if (!customizeItem) return
+    
+    const customizedItem: CartItem = {
       ...customizeItem,
       size: customizations.size,
       addons: customizations.addons,
@@ -191,12 +211,10 @@ export default function NewOrder({ onCheckout }: any) {
     }
 
     if (editingItemIndex !== null) {
-      // Update existing item
-      const updatedCart : any = [...cart]
+      const updatedCart = [...cart]
       updatedCart[editingItemIndex] = customizedItem
       setCart(updatedCart)
     } else {
-      // Add new item
       setCart([...cart, customizedItem])
     }
 
@@ -211,15 +229,14 @@ export default function NewOrder({ onCheckout }: any) {
   }
 
   // Calculate addon price
-  const calculateAddonPrice = (addons : any) => {
-    const addonPrices = {
+  const calculateAddonPrice = (addons: string[]) => {
+    const addonPrices: { [key: string]: number } = {
       "Extra Cheese": 1.99,
-      Bacon: 2.49,
-      Avocado: 1.99,
-      Mushrooms: 1.49,
+      "Bacon": 2.49,
+      "Avocado": 1.99,
+      "Mushrooms": 1.49,
     }
-
-    return addons.reduce((sum : any, addon : any) => sum + (addonPrices[addon] || 0), 0)
+    return addons.reduce((sum, addon) => sum + (addonPrices[addon] || 0), 0)
   }
 
   // Calculate total item price including addons
@@ -361,7 +378,11 @@ export default function NewOrder({ onCheckout }: any) {
               <ScrollArea className="h-[calc(100vh-12rem)]">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {category.items.map((item : any) => (
-                    <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow border-blue-100">
+                    <Card 
+                      key={item.id} 
+                      className="overflow-hidden hover:shadow-md transition-shadow border-blue-100 cursor-pointer hover:bg-blue-50"
+                      onClick={() => addToCart(item)}
+                    >
                       <CardContent className="p-0">
                         <div className="aspect-video bg-blue-50 flex items-center justify-center">
                           <img
@@ -376,26 +397,18 @@ export default function NewOrder({ onCheckout }: any) {
                               <h3 className="font-medium text-blue-900">{item.name}</h3>
                               <p className="text-sm text-blue-600">${item.price.toFixed(2)}</p>
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                onClick={() => handleEditMenuItem(category.id, item)}
-                              >
-                                <Edit className="h-5 w-5" />
-                                <span className="sr-only">Edit {item.name}</span>
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                onClick={() => addToCart(item)}
-                              >
-                                <Plus className="h-5 w-5" />
-                                <span className="sr-only">Add {item.name}</span>
-                              </Button>
-                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent card click event
+                                handleEditMenuItem(category.id, item);
+                              }}
+                            >
+                              <Edit className="h-5 w-5" />
+                              <span className="sr-only">Edit {item.name}</span>
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -532,187 +545,248 @@ export default function NewOrder({ onCheckout }: any) {
       {/* Item Customization Modal */}
       {customizeItem && (
         <Dialog open={true} onOpenChange={() => setCustomizeItem(null)}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Customize {customizeItem.name}</DialogTitle>
+          <DialogContent className="sm:max-w-[800px] h-[85vh] flex flex-col shadow-2xl">
+            <DialogHeader className="pb-2 border-b ">
+              <DialogTitle className="text-2xl text-blue-950">{customizeItem.name}</DialogTitle>
+              {customizeItem.description && (
+                <p className="text-blue-700 mt-1">{customizeItem.description}</p>
+              )}
             </DialogHeader>
 
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Size</Label>
-                <RadioGroup
-                  value={customizations.size}
-                  onValueChange={(value) => setCustomizations({ ...customizations, size: value })}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="small" id="size-small" />
-                    <Label htmlFor="size-small">Small</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="medium" id="size-medium" />
-                    <Label htmlFor="size-medium">Medium</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="large" id="size-large" />
-                    <Label htmlFor="size-large">Large</Label>
-                  </div>
-                </RadioGroup>
-              </div>
+            <ScrollArea className="flex-1">
+              <div className="grid gap-3 p-4 bg-slate-50">
+                <div className="space-y-3 bg-orange-100 p-4 rounded-lg shadow-md">
+                  <Label className="text-lg font-semibold text-orange-950">Size</Label>
+                  <RadioGroup
+                    value={customizations.size}
+                    onValueChange={(value) => setCustomizations({ ...customizations, size: value })}
+                    className="grid grid-cols-3 gap-3"
+                  >
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-orange-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-orange-600 [&:has([data-state=checked])]:bg-orange-50 [&:has([data-state=checked])]:shadow-md">
+                      <RadioGroupItem value="small" id="size-small" className="text-orange-700" />
+                      <Label htmlFor="size-small" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-orange-950">Small</div>
+                        <div className="text-sm text-orange-700">-20% portion</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-orange-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-orange-600 [&:has([data-state=checked])]:bg-orange-50 [&:has([data-state=checked])]:shadow-md">
+                      <RadioGroupItem value="medium" id="size-medium" className="text-orange-700" />
+                      <Label htmlFor="size-medium" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-orange-950">Medium</div>
+                        <div className="text-sm text-orange-700">Regular size</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-orange-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-orange-600 [&:has([data-state=checked])]:bg-orange-50 [&:has([data-state=checked])]:shadow-md">
+                      <RadioGroupItem value="large" id="size-large" className="text-orange-700" />
+                      <Label htmlFor="size-large" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-orange-950">Large</div>
+                        <div className="text-sm text-orange-700">+20% portion</div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
 
-              <div className="space-y-2">
-                <Label>Add-ons</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="addon-cheese"
-                      checked={customizations.addons.includes("Extra Cheese")}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setCustomizations({
-                            ...customizations,
-                            addons: [...customizations.addons, "Extra Cheese"],
-                          })
-                        } else {
-                          setCustomizations({
-                            ...customizations,
-                            addons: customizations.addons.filter((addon) => addon !== "Extra Cheese"),
-                          })
-                        }
-                      }}
-                    />
-                    <Label htmlFor="addon-cheese">Extra Cheese (+$1.99)</Label>
+                <div className="space-y-3 bg-green-100 p-4 rounded-lg shadow-md">
+                  <Label className="text-lg font-semibold text-green-950">Add-ons</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-green-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-green-600 [&:has([data-state=checked])]:bg-green-50 [&:has([data-state=checked])]:shadow-md">
+                      <Checkbox
+                        id="addon-cheese"
+                        checked={customizations.addons.includes("Extra Cheese")}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setCustomizations({
+                              ...customizations,
+                              addons: [...customizations.addons, "Extra Cheese"],
+                            })
+                          } else {
+                            setCustomizations({
+                              ...customizations,
+                              addons: customizations.addons.filter((addon) => addon !== "Extra Cheese"),
+                            })
+                          }
+                        }}
+                        className="text-green-700"
+                      />
+                      <Label htmlFor="addon-cheese" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-green-950">Extra Cheese</div>
+                        <div className="text-sm text-green-700">+$1.99</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-green-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-green-600 [&:has([data-state=checked])]:bg-green-50 [&:has([data-state=checked])]:shadow-md">
+                      <Checkbox
+                        id="addon-bacon"
+                        checked={customizations.addons.includes("Bacon")}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setCustomizations({
+                              ...customizations,
+                              addons: [...customizations.addons, "Bacon"],
+                            })
+                          } else {
+                            setCustomizations({
+                              ...customizations,
+                              addons: customizations.addons.filter((addon) => addon !== "Bacon"),
+                            })
+                          }
+                        }}
+                        className="text-green-700"
+                      />
+                      <Label htmlFor="addon-bacon" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-green-950">Bacon</div>
+                        <div className="text-sm text-green-700">+$2.49</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-green-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-green-600 [&:has([data-state=checked])]:bg-green-50 [&:has([data-state=checked])]:shadow-md">
+                      <Checkbox
+                        id="addon-avocado"
+                        checked={customizations.addons.includes("Avocado")}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setCustomizations({
+                              ...customizations,
+                              addons: [...customizations.addons, "Avocado"],
+                            })
+                          } else {
+                            setCustomizations({
+                              ...customizations,
+                              addons: customizations.addons.filter((addon) => addon !== "Avocado"),
+                            })
+                          }
+                        }}
+                        className="text-green-700"
+                      />
+                      <Label htmlFor="addon-avocado" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-green-950">Avocado</div>
+                        <div className="text-sm text-green-700">+$1.99</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-green-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-green-600 [&:has([data-state=checked])]:bg-green-50 [&:has([data-state=checked])]:shadow-md">
+                      <Checkbox
+                        id="addon-mushrooms"
+                        checked={customizations.addons.includes("Mushrooms")}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setCustomizations({
+                              ...customizations,
+                              addons: [...customizations.addons, "Mushrooms"],
+                            })
+                          } else {
+                            setCustomizations({
+                              ...customizations,
+                              addons: customizations.addons.filter((addon) => addon !== "Mushrooms"),
+                            })
+                          }
+                        }}
+                        className="text-green-700"
+                      />
+                      <Label htmlFor="addon-mushrooms" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-green-950">Mushrooms</div>
+                        <div className="text-sm text-green-700">+$1.49</div>
+                      </Label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="addon-bacon"
-                      checked={customizations.addons.includes("Bacon")}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setCustomizations({
-                            ...customizations,
-                            addons: [...customizations.addons, "Bacon"],
-                          })
-                        } else {
-                          setCustomizations({
-                            ...customizations,
-                            addons: customizations.addons.filter((addon) => addon !== "Bacon"),
-                          })
+                </div>
+
+                <div className="space-y-3 bg-purple-100 p-4 rounded-lg shadow-md">
+                  <Label className="text-lg font-semibold text-purple-950">Cooking Preference</Label>
+                  <RadioGroup
+                    value={customizations.cookingPreference}
+                    onValueChange={(value) => setCustomizations({ ...customizations, cookingPreference: value })}
+                    className="grid grid-cols-3 gap-3"
+                  >
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-purple-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-purple-600 [&:has([data-state=checked])]:bg-purple-50 [&:has([data-state=checked])]:shadow-md">
+                      <RadioGroupItem value="Rare" id="cooking-rare" className="text-purple-700" />
+                      <Label htmlFor="cooking-rare" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-purple-950">Rare</div>
+                        <div className="text-sm text-purple-700">Light cooking</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-purple-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-purple-600 [&:has([data-state=checked])]:bg-purple-50 [&:has([data-state=checked])]:shadow-md">
+                      <RadioGroupItem value="Medium" id="cooking-medium" className="text-purple-700" />
+                      <Label htmlFor="cooking-medium" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-purple-950">Medium</div>
+                        <div className="text-sm text-purple-700">Standard cooking</div>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer bg-white shadow-sm hover:bg-purple-50 hover:shadow-md transition-all [&:has([data-state=checked])]:border-purple-600 [&:has([data-state=checked])]:bg-purple-50 [&:has([data-state=checked])]:shadow-md">
+                      <RadioGroupItem value="Well-done" id="cooking-well" className="text-purple-700" />
+                      <Label htmlFor="cooking-well" className="flex-1 cursor-pointer">
+                        <div className="font-medium text-purple-950">Well-done</div>
+                        <div className="text-sm text-purple-700">Thorough cooking</div>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-3 bg-blue-100 p-4 rounded-lg shadow-md">
+                  <Label htmlFor="special-instructions" className="text-lg font-semibold text-blue-950">Special Instructions</Label>
+                  <Input
+                    id="special-instructions"
+                    value={customizations.specialInstructions}
+                    onChange={(e) => setCustomizations({ ...customizations, specialInstructions: e.target.value })}
+                    placeholder="E.g., No onions, extra spicy, allergies, etc."
+                    className="h-16 bg-white shadow-sm focus:shadow-md transition-shadow"
+                  />
+                </div>
+
+                <div className="space-y-3 bg-amber-100 p-4 rounded-lg shadow-md">
+                  <Label className="text-lg font-semibold text-amber-950">Quantity</Label>
+                  <div className="flex items-center border rounded-lg w-40 overflow-hidden bg-white shadow-sm">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-12 w-12 rounded-none hover:bg-amber-50 text-amber-700"
+                      onClick={() => {
+                        if (customizations.quantity > 1) {
+                          setCustomizations({ ...customizations, quantity: customizations.quantity - 1 })
                         }
                       }}
-                    />
-                    <Label htmlFor="addon-bacon">Bacon (+$2.49)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="addon-avocado"
-                      checked={customizations.addons.includes("Avocado")}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setCustomizations({
-                            ...customizations,
-                            addons: [...customizations.addons, "Avocado"],
-                          })
-                        } else {
-                          setCustomizations({
-                            ...customizations,
-                            addons: customizations.addons.filter((addon) => addon !== "Avocado"),
-                          })
-                        }
-                      }}
-                    />
-                    <Label htmlFor="addon-avocado">Avocado (+$1.99)</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="addon-mushrooms"
-                      checked={customizations.addons.includes("Mushrooms")}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setCustomizations({
-                            ...customizations,
-                            addons: [...customizations.addons, "Mushrooms"],
-                          })
-                        } else {
-                          setCustomizations({
-                            ...customizations,
-                            addons: customizations.addons.filter((addon) => addon !== "Mushrooms"),
-                          })
-                        }
-                      }}
-                    />
-                    <Label htmlFor="addon-mushrooms">Mushrooms (+$1.49)</Label>
+                    >
+                      <Minus className="h-4 w-4" />
+                      <span className="sr-only">Decrease</span>
+                    </Button>
+                    <div className="flex-1 text-center text-lg font-medium text-amber-950">{customizations.quantity}</div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-12 w-12 rounded-none hover:bg-amber-50 text-amber-700"
+                      onClick={() => setCustomizations({ ...customizations, quantity: customizations.quantity + 1 })}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="sr-only">Increase</span>
+                    </Button>
                   </div>
                 </div>
               </div>
+            </ScrollArea>
 
-              <div className="space-y-2">
-                <Label>Cooking Preference</Label>
-                <RadioGroup
-                  value={customizations.cookingPreference}
-                  onValueChange={(value) => setCustomizations({ ...customizations, cookingPreference: value })}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Rare" id="cooking-rare" />
-                    <Label htmlFor="cooking-rare">Rare</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Medium" id="cooking-medium" />
-                    <Label htmlFor="cooking-medium">Medium</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Well-done" id="cooking-well" />
-                    <Label htmlFor="cooking-well">Well-done</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="special-instructions">Special Instructions</Label>
-                <Input
-                  id="special-instructions"
-                  value={customizations.specialInstructions}
-                  onChange={(e) => setCustomizations({ ...customizations, specialInstructions: e.target.value })}
-                  placeholder="E.g., No onions, extra spicy, etc."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Quantity</Label>
-                <div className="flex items-center border rounded-md w-32">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-none"
-                    onClick={() => {
-                      if (customizations.quantity > 1) {
-                        setCustomizations({ ...customizations, quantity: customizations.quantity - 1 })
-                      }
-                    }}
+            <DialogFooter className="border-t pt-10 bg-slate-100 shadow-inner">
+              <div className="flex items-center justify-between w-full">
+                <div className="text-lg font-semibold text-slate-900 text-xl">
+                  Total: ${(calculateItemTotal({
+                    ...customizeItem,
+                    size: customizations.size,
+                    addons: customizations.addons,
+                    quantity: customizations.quantity,
+                  })).toFixed(2)}
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setCustomizeItem(null)}
+                    className="shadow-sm hover:shadow-md transition-shadow p-10 m-2 text-xl"
                   >
-                    <Minus className="h-3 w-3" />
-                    <span className="sr-only">Decrease</span>
+                    Cancel
                   </Button>
-                  <span className="flex-1 text-center">{customizations.quantity}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-none"
-                    onClick={() => setCustomizations({ ...customizations, quantity: customizations.quantity + 1 })}
+                  <Button 
+                    onClick={confirmCustomization} 
+                    className="px-8 bg-blue-700 hover:bg-blue-800 shadow-sm hover:shadow-md transition-all p-10 m-2 text-xl"
                   >
-                    <Plus className="h-3 w-3" />
-                    <span className="sr-only">Increase</span>
+                    Add to Order
                   </Button>
                 </div>
               </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCustomizeItem(null)}>
-                Cancel
-              </Button>
-              <Button onClick={confirmCustomization}>Add to Order</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
