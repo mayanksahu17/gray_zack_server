@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { Filter, MoreHorizontal, Plus, RefreshCw, Search, SlidersHorizontal, Trash2 } from "lucide-react"
+import { Filter, MoreHorizontal, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, Pencil } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
 // Define table interface
@@ -51,7 +51,11 @@ export default function RestaurantTables() {
   const fetchTables = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        }
+      })
       const data = await response.json()
 
       if (data.success) {
@@ -60,7 +64,7 @@ export default function RestaurantTables() {
       } else {
         toast({
           title: "Error fetching tables",
-          description: "Could not retrieve table data",
+          description: data.message || "Could not retrieve table data",
           variant: "destructive",
         })
       }
@@ -83,10 +87,12 @@ export default function RestaurantTables() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify(newTable),
       })
       const data = await response.json()
+      
       if (data.success) {
         toast({
           title: "Success",
@@ -96,16 +102,12 @@ export default function RestaurantTables() {
         setNewTable({ status: "available", features: [] })
         fetchTables()
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to add table",
-          variant: "destructive",
-        })
+        throw new Error(data.message || "Failed to add table")
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to add table",
+        description: error instanceof Error ? error.message : "Failed to add table",
         variant: "destructive",
       })
     }
@@ -116,8 +118,12 @@ export default function RestaurantTables() {
     try {
       const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableNumber}`, {
         method: 'DELETE',
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        }
       })
       const data = await response.json()
+      
       if (data.success) {
         toast({
           title: "Success",
@@ -125,16 +131,12 @@ export default function RestaurantTables() {
         })
         fetchTables()
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to delete table",
-          variant: "destructive",
-        })
+        throw new Error(data.message || "Failed to delete table")
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to delete table",
+        description: error instanceof Error ? error.message : "Failed to delete table",
         variant: "destructive",
       })
     }
@@ -147,10 +149,12 @@ export default function RestaurantTables() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({ status: newStatus }),
       })
       const data = await response.json()
+      
       if (data.success) {
         toast({
           title: "Status updated",
@@ -158,16 +162,43 @@ export default function RestaurantTables() {
         })
         fetchTables()
       } else {
-        toast({
-          title: "Update failed",
-          description: "Could not update table status",
-          variant: "destructive",
-        })
+        throw new Error(data.message || "Could not update table status")
       }
     } catch (error) {
       toast({
         title: "Update failed",
-        description: "Could not update table status",
+        description: error instanceof Error ? error.message : "Could not update table status",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Update table details
+  const handleUpdateTable = async (tableNumber: string, updateData: Partial<RestaurantTable>) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables/${tableNumber}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(updateData),
+      })
+      const data = await response.json()
+      
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: "Table updated successfully",
+        })
+        fetchTables()
+      } else {
+        throw new Error(data.message || "Failed to update table")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update table",
         variant: "destructive",
       })
     }
@@ -353,7 +384,8 @@ export default function RestaurantTables() {
                                   setIsUpdateDialogOpen(true)
                                 }}
                               >
-                                Update Status
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit Table
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteTable(table.tableNumber)}
@@ -375,14 +407,58 @@ export default function RestaurantTables() {
         </CardContent>
       </Card>
 
-      {/* Update Status Dialog */}
+      {/* Update Table Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update Table Status</DialogTitle>
-            <DialogDescription>Change the status of table {selectedTable?.tableNumber}</DialogDescription>
+            <DialogTitle>Update Table</DialogTitle>
+            <DialogDescription>Update table {selectedTable?.tableNumber} details</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="capacity" className="text-right">
+                Capacity
+              </Label>
+              <Input
+                id="capacity"
+                type="number"
+                className="col-span-3"
+                defaultValue={selectedTable?.capacity}
+                onChange={(e) => {
+                  if (selectedTable) {
+                    setSelectedTable({
+                      ...selectedTable,
+                      capacity: parseInt(e.target.value)
+                    })
+                  }
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="location" className="text-right">
+                Location
+              </Label>
+              <Select
+                defaultValue={selectedTable?.location}
+                onValueChange={(value) => {
+                  if (selectedTable) {
+                    setSelectedTable({
+                      ...selectedTable,
+                      location: value
+                    })
+                  }
+                }}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="indoor">Indoor</SelectItem>
+                  <SelectItem value="outdoor">Outdoor</SelectItem>
+                  <SelectItem value="bar">Bar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="status" className="text-right">
                 Status
@@ -391,8 +467,10 @@ export default function RestaurantTables() {
                 defaultValue={selectedTable?.status}
                 onValueChange={(value) => {
                   if (selectedTable) {
-                    updateTableStatus(selectedTable._id, value)
-                    setIsUpdateDialogOpen(false)
+                    setSelectedTable({
+                      ...selectedTable,
+                      status: value as RestaurantTable['status']
+                    })
                   }
                 }}
               >
@@ -407,10 +485,42 @@ export default function RestaurantTables() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="features" className="text-right">
+                Features
+              </Label>
+              <Input
+                id="features"
+                className="col-span-3"
+                placeholder="Comma separated features"
+                defaultValue={selectedTable?.features.join(', ')}
+                onChange={(e) => {
+                  if (selectedTable) {
+                    setSelectedTable({
+                      ...selectedTable,
+                      features: e.target.value.split(',').map(f => f.trim())
+                    })
+                  }
+                }}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
               Cancel
+            </Button>
+            <Button onClick={() => {
+              if (selectedTable) {
+                handleUpdateTable(selectedTable.tableNumber, {
+                  capacity: selectedTable.capacity,
+                  location: selectedTable.location,
+                  status: selectedTable.status,
+                  features: selectedTable.features
+                });
+                setIsUpdateDialogOpen(false);
+              }
+            }}>
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

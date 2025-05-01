@@ -149,9 +149,33 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   }
 
   // Handle table selection
-  const handleSelectTable = (table: Table) => {
-    setSelectedTable(table)
-    setIsTableDialogOpen(false)
+  const handleSelectTable = async (table: Table) => {
+    try {
+      // Update table status to occupied
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables/${table.tableNumber}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ status: 'occupied' })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update table status');
+      }
+
+      setSelectedTable(table);
+      setIsTableDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating table status:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update table status",
+        variant: "destructive",
+      });
+    }
   }
 
   // Handle opening the booking selection dialog

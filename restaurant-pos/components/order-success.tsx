@@ -63,7 +63,7 @@ export default function OrderSuccess({ orderId, onBackToOrders }: OrderSuccessPr
     const fetchOrderDetails = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/orders/${orderId}`,
+          `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/orders/67ef81567420feb65107a50c`,
           {
             headers: {
               "Authorization": `Bearer ${localStorage.getItem('token')}`
