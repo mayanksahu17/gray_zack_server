@@ -62,16 +62,6 @@ export default function OrderSuccess({ orderId, onBackToOrders }: OrderSuccessPr
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
-<<<<<<< HEAD
-        const restaurantId = "67e8f522404a64803d0cea8d"; // Added missing restaurantId
-        const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders/${orderId}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-=======
         const response = await fetch(
           `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/orders/67ef81567420feb65107a50c`,
           {
@@ -81,7 +71,6 @@ export default function OrderSuccess({ orderId, onBackToOrders }: OrderSuccessPr
           }
         )
         const data = await response.json()
->>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
         
         if (!data.success) {
           throw new Error(data.message || "Failed to fetch order details")
@@ -101,78 +90,7 @@ export default function OrderSuccess({ orderId, onBackToOrders }: OrderSuccessPr
     }
   }, [orderId])
 
-<<<<<<< HEAD
-  // Function to handle saving an order
-  // const saveOrder = async (orderData: any) => {
-  //   try {
-  //     const response = await fetch('http://localhost:8000/api/orders', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify(orderData),
-  //     });
-
-  //     if (!response.ok) {
-  //       throw new Error('Failed to save order');
-  //     }
-      
-  //     const data = await response.json();
-  //     return data;
-  //   } catch (error) {
-  //     console.error("Error saving order:", error);
-  //     throw error;
-  //   }
-  // };
-
-  const handlePrintReceipt = () => {
-    // Implement receipt printing logic
-    window.print();
-  };
-
-  const handleEmailReceipt = () => {
-    if (!order?.customer.email) {
-      toast({
-        title: "No email available",
-        description: "Customer email is not provided for this order.",
-        variant: "destructive",
-      });
-      return;
-    }
-    // Implement email receipt logic
-    console.log("Emailing receipt for order:", order);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "paid":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "failed":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  if (isLoading) {
-=======
   if (loading) {
->>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="w-full max-w-2xl">

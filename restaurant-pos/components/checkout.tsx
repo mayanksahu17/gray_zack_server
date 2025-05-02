@@ -200,32 +200,6 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const processOrder = async (orderDetails: OrderDetails) => {
     setIsProcessing(true)
     try {
-<<<<<<< HEAD
-      // 1. Process payment
-      const paymentResponse = await fetch("http://localhost:8000/api/restaurants/payments/process", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          orderId: orderDetails.orderId,
-          amount: orderDetails.total,
-          currency: "USD",
-          paymentMethod: orderDetails.paymentMethod,
-          cardDetails: paymentMethod === "card" ? cardDetails : null,
-        }),
-      });
-      
-      const paymentData = await paymentResponse.json();
-      
-      if (!paymentData.success) {
-        throw new Error(paymentData.message || "Payment processing failed");
-      }
-      
-      // 2. Create order with payment information
-=======
->>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
       const orderResponse = await fetch(`http://localhost:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
         method: "POST",
         headers: {
@@ -268,13 +242,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
         throw new Error(orderData.message || "Order creation failed")
       }
       
-<<<<<<< HEAD
-      // 3. If charging to room, create room service charge
-      if (paymentMethod === "room" && selectedBooking) {
-=======
       // Create room service charge
       if (selectedBooking) {
->>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
         const roomServiceResponse = await fetch("http://localhost:8000/api/v1/room-service/charge", {
           method: "POST",
           headers: {

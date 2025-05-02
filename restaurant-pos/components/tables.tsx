@@ -51,15 +51,11 @@ export default function RestaurantTables() {
   const fetchTables = async () => {
     setLoading(true)
     try {
-<<<<<<< HEAD
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`)
-=======
       const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`, {
         headers: {
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         }
       })
->>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
       const data = await response.json()
 
       if (data.success) {
