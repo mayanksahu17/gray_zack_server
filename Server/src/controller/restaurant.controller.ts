@@ -251,7 +251,7 @@ export const addMenuCategory = async (req: Request, res: Response) => {
 //     if (!updateData.items) {
 //       updateData.items = restaurant.menu[categoryIndex].items;
 //     }
-     
+    
 //     restaurant.menu[categoryIndex] = {
 //       ...restaurant.menu[categoryIndex].toObject(),
 //       ...updateData
@@ -690,7 +690,7 @@ export const deleteRestaurantTable = async (req: Request, res: Response) => {
  */
 export const updateTableStatus = async (req: Request, res: Response) => {
   try {
-    const { id, tableNumber } = req.params;
+    const { id, tableId } = req.params;
     const { status, orderId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -702,11 +702,11 @@ export const updateTableStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber);
+    const tableIndex = restaurant.tables.findIndex(t => t.tableNumber === tableId);
     if (tableIndex === -1) {
       return res.status(404).json({ 
         success: false, 
-        // message: `Table with number ${tableId} not found` 
+        message: `Table with number ${tableId} not found`
       });
     }
 
@@ -973,7 +973,7 @@ try {
   }
 
   // Validate payment method
-  const validPaymentMethods = ['cash', 'card', 'wallet', 'qr'];
+  const validPaymentMethods = ['cash', 'card', 'wallet', 'qr', 'room'];
   if (!validPaymentMethods.includes(paymentMethod)) {
     return res.status(400).json({
       success: false,

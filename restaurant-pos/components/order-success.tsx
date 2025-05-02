@@ -1,58 +1,68 @@
 "use client"
 
-import { Check, Printer, Mail, ShoppingBag, Clock, CreditCard, Table2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { useEffect, useState } from "react"
-import { useToast } from "@/components/ui/use-toast"
+import { CheckCircle, ArrowLeft, Printer, Download } from "lucide-react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+interface OrderSuccessProps {
+  orderId: string
+  onBackToOrders?: () => void
+}
 
 interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
-  notes?: string;
-  modifiers?: string[];
-  subtotal: number;
+  id: string
+  name: string
+  quantity: number
+  price: number
+  subtotal: number
+  notes?: string
+  modifiers?: string[]
+  size?: string
+  addons?: string[]
+  cookingPreference?: string
+  specialInstructions?: string
 }
 
-interface Order {
-  _id: string;
-  orderNumber: string;
+interface OrderDetails {
+  id: string
+  orderNumber: string
+  items: OrderItem[]
+  total: number
+  tax: number
+  tip?: number
+  specialInstructions?: string
   customer: {
-    name: string;
-    phone?: string;
-    email?: string;
-    address?: string;
-  };
-  items: OrderItem[];
-  status: string;
-  type: string;
-  tableNumber?: string;
-  subtotal: number;
-  tax: number;
-  total: number;
-  payment: {
-    method: string;
-    status: string;
-    amount: number;
-    transactionId?: string;
-    paymentDate?: string;
-  };
-  orderDate: string;
-  estimatedReadyTime?: string;
+    name: string
+    phone?: string
+    email?: string
+    address?: string
+  }
+  room?: {
+    number: string
+    guest: string
+    checkIn: string
+  }
+  table?: {
+    number: string
+    location: string
+  }
+  status: string
+  createdAt: string
 }
 
-export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string, onNewOrder: () => void }) {
-  const { toast } = useToast();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default function OrderSuccess({ orderId, onBackToOrders }: OrderSuccessProps) {
+  const [order, setOrder] = useState<OrderDetails | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
+<<<<<<< HEAD
         const restaurantId = "67e8f522404a64803d0cea8d"; // Added missing restaurantId
         const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders/${orderId}`);
         
@@ -61,29 +71,37 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
         }
         
         const data = await response.json();
+=======
+        const response = await fetch(
+          `http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/orders/67ef81567420feb65107a50c`,
+          {
+            headers: {
+              "Authorization": `Bearer ${localStorage.getItem('token')}`
+            }
+          }
+        )
+        const data = await response.json()
+>>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
         
         if (!data.success) {
-          throw new Error(data.message || "Failed to fetch order details");
+          throw new Error(data.message || "Failed to fetch order details")
         }
         
-        setOrder(data.data);
+        setOrder(data.data)
       } catch (error) {
-        console.error("Error fetching order details:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch order details. Please try again.",
-          variant: "destructive",
-        });
+        console.error("Error fetching order details:", error)
+        setError(error instanceof Error ? error.message : "Failed to fetch order details")
       } finally {
-        setIsLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
     if (orderId) {
-      fetchOrderDetails();
+      fetchOrderDetails()
     }
-  }, [orderId, toast]);
+  }, [orderId])
 
+<<<<<<< HEAD
   // Function to handle saving an order
   // const saveOrder = async (orderData: any) => {
   //   try {
@@ -152,157 +170,205 @@ export default function OrderSuccess({ orderId, onNewOrder }: { orderId: string,
   };
 
   if (isLoading) {
+=======
+  if (loading) {
+>>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
     return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <Card className="border-blue-100 shadow-md">
-          <CardHeader>
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="py-20">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <p className="text-xl text-muted-foreground">Loading order details...</p>
+            </div>
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
-  if (!order) {
+  if (error || !order) {
     return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <Card className="border-blue-100 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-red-600">Order Not Found</CardTitle>
-            <CardDescription>Could not find the requested order.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={onNewOrder} className="w-full">
-              <ShoppingBag className="mr-2 h-4 w-4" />
-              Start New Order
-            </Button>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="py-20">
+            <div className="flex flex-col items-center space-y-4 text-destructive">
+              <p className="text-xl">Error: {error || "Order not found"}</p>
+              {onBackToOrders && (
+                <Button onClick={onBackToOrders} variant="outline">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Orders
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="flex flex-col items-center justify-center mb-8">
-        <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-          <Check className="h-8 w-8 text-blue-600" />
-        </div>
-        <h1 className="text-2xl font-bold text-blue-800">Order Successful!</h1>
-        <p className="text-muted-foreground">Your order has been placed successfully.</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-6 text-xl">
+        {onBackToOrders && (
+          <Button variant="ghost" size="sm" onClick={onBackToOrders} className="mb-6">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
+          </Button>
+        )}
 
-      <Card className="border-blue-100 shadow-md">
-        <CardHeader className="text-center bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-lg">
-          <CardTitle className="text-blue-800">Order #{order.orderNumber}</CardTitle>
-          <CardDescription className="text-blue-600">{formatDate(order.orderDate)}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge className={getStatusColor(order.status)}>
-                  {order.status}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className={getPaymentStatusColor(order.payment.status)}>
-                  {order.payment.status}
-                </Badge>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Table2 className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">
-                  {order.type === "DINE_IN" && `Dine-In ${order.tableNumber ? `(Table ${order.tableNumber})` : ''}`}
-                  {order.type === "TAKEOUT" && "Takeaway"}
-                  {order.type === "DELIVERY" && "Delivery"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-blue-600" />
-                <span className="text-sm capitalize">{order.payment.method.toLowerCase()}</span>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            {order.items.map((item, index) => (
-              <div key={index} className="flex justify-between">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Success Header */}
+          <Card>
+            <CardContent className="pt-6 pb-4">
+              <div className="flex flex-col items-center space-y-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
                 <div>
-                  <span className="font-medium">{item.quantity}x</span> {item.name}
-                  {item.notes && <div className="text-sm text-muted-foreground">Note: {item.notes}</div>}
-                  {item.modifiers && item.modifiers.length > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      Modifiers: {item.modifiers.join(", ")}
+                  <h1 className="text-2xl font-semibold text-green-600">Order Successfully Placed!</h1>
+                  <p className="text-muted-foreground mt-1">Order #{order.orderNumber}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print Receipt
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download PDF
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order Details */}
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Left Column - Order Items */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+                <CardDescription>Order placed on {new Date(order.createdAt).toLocaleString()}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[300px] pr-4">
+                  <div className="space-y-4">
+                    {order.items.map((item, index) => (
+                      <div key={index} className="flex justify-between">
+                        <div>
+                          <div className="font-medium">
+                            {item.quantity}x {item.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            {item.size && <span>Size: {item.size.charAt(0).toUpperCase() + item.size.slice(1)}</span>}
+                            {item.addons && item.addons.length > 0 && <div>Add-ons: {item.addons.join(", ")}</div>}
+                            {item.cookingPreference && <div>Cooking: {item.cookingPreference}</div>}
+                            {item.specialInstructions && <div>Note: {item.specialInstructions}</div>}
+                          </div>
+                        </div>
+                        <div className="font-medium">${item.subtotal.toFixed(2)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                <Separator className="my-4" />
+
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>${(order.total - order.tax).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax</span>
+                    <span>${order.tax.toFixed(2)}</span>
+                  </div>
+                  {order.tip && order.tip > 0 && (
+                    <div className="flex justify-between">
+                      <span>Tip</span>
+                      <span>${order.tip.toFixed(2)}</span>
                     </div>
                   )}
+                  <Separator />
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span>${order.total.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div>${item.subtotal.toFixed(2)}</div>
-              </div>
-            ))}
-          </div>
+              </CardContent>
+            </Card>
 
-          <Separator />
+            {/* Right Column - Room & Table Info */}
+            <div className="space-y-6">
+              {/* Room Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Room Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {order.room ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">Room {order.room.number}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Guest: {order.room.guest}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Check-in: {new Date(order.room.checkIn).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge>Room Service</Badge>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No room information available</p>
+                  )}
+                </CardContent>
+              </Card>
 
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>${order.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tax</span>
-              <span>${order.tax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-lg pt-2">
-              <span>Total</span>
-              <span>${order.total.toFixed(2)}</span>
+              {/* Table Information */}
+              {order.table && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Table Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-medium">Table {order.table.number}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Location: {order.table.location}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Order Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Order Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between items-center">
+                    <span>Current Status</span>
+                    <Badge 
+                      variant={order.status === "COMPLETED" ? "default" : "secondary"}
+                      className="text-base px-4 py-1"
+                    >
+                      {order.status}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
-
-          {order.estimatedReadyTime && (
-            <div className="mt-4 flex items-center gap-2 text-blue-600">
-              <Clock className="h-4 w-4" />
-              <span>Estimated Ready Time: {formatDate(order.estimatedReadyTime)}</span>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <div className="flex gap-4 w-full">
-            <Button variant="outline" className="flex-1" onClick={handlePrintReceipt}>
-              <Printer className="mr-2 h-4 w-4" />
-              Print Receipt
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex-1" 
-              onClick={handleEmailReceipt}
-              disabled={!order.customer.email}
-            >
-              <Mail className="mr-2 h-4 w-4" />
-              Email Receipt
-            </Button>
-          </div>
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={onNewOrder}>
-            <ShoppingBag className="mr-2 h-4 w-4" />
-            New Order
-          </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
-  );
+  )
 }

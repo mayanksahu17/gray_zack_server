@@ -1,15 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, CreditCard, Wallet, QrCode, DollarSign, Users, Truck, Home, X, CheckCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Home, X, CheckCircle, Loader2, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -33,6 +31,12 @@ interface Booking {
     _id: string
     firstName: string
     lastName: string
+    personalInfo: {
+      firstName: string
+      lastName: string
+      phone?: string
+      email?: string
+    }
   }
   checkIn: string
   expectedCheckOut: string
@@ -63,6 +67,10 @@ interface OrderDetails {
   paymentMethod: string
 }
 
+interface FormEvent extends React.FormEvent {
+  preventDefault(): void
+}
+
 interface Table {
   _id: string
   tableNumber: string
@@ -72,16 +80,10 @@ interface Table {
   features: string[]
 }
 
-interface FormEvent extends React.FormEvent {
-  preventDefault(): void
-}
-
 export default function Checkout({ order, onComplete, onBack } : any) {
-  const [diningOption, setDiningOption] = useState("dine-in")
-  const [tableNumber, setTableNumber] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState("cash")
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false)
   const [tables, setTables] = useState<Table[]>([])
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [activeBookings, setActiveBookings] = useState<Booking[]>([])
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false)
@@ -91,17 +93,11 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     email: "",
     address: ""
   })
-  const [cardDetails, setCardDetails] = useState({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: ""
-  })
   const [isProcessing, setIsProcessing] = useState(false)
   const [isPaymentSuccessful, setIsPaymentSuccessful] = useState(false)
   const { toast } = useToast()
 
   // Function to fetch tables data
-
   const fetchTables = async () => {
     try {
       const response = await fetch(
@@ -123,7 +119,6 @@ export default function Checkout({ order, onComplete, onBack } : any) {
 
   // Function to fetch active bookings
   const fetchActiveBookings = async (hotelId: string) => {
-    
     try {
       const response = await fetch(
         `http://localhost:8000/api/v1/room-service/active-bookings/60d21b4667d0d8992e610c85`,
@@ -154,14 +149,38 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   }
 
   // Handle table selection
-  const handleSelectTable = (tableNum : any) => {
-    setTableNumber(tableNum)
-    setIsTableDialogOpen(false)
+  const handleSelectTable = async (table: Table) => {
+    try {
+      // Update table status to occupied
+      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables/${table.tableNumber}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ status: 'occupied' })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to update table status');
+      }
+
+      setSelectedTable(table);
+      setIsTableDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating table status:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update table status",
+        variant: "destructive",
+      });
+    }
   }
 
   // Handle opening the booking selection dialog
   const handleOpenBookingDialog = () => {
-    fetchActiveBookings("67e8f522404a64803d0cea8d") // Replace with actual hotelId
+    fetchActiveBookings("67e8f522404a64803d0cea8d")
     setIsBookingDialogOpen(true)
   }
 
@@ -169,18 +188,19 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const handleSelectBooking = (booking: Booking) => {
     setSelectedBooking(booking)
     setCustomerInfo({
-      name: `${booking.guestId.firstName} ${booking.guestId.lastName}`,
-      phone: "",
-      email: "",
+      name: `${booking.guestId.personalInfo.firstName} ${booking.guestId.personalInfo.lastName}`,
+      phone: booking.guestId.personalInfo.phone || "",
+      email: booking.guestId.personalInfo.email || "",
       address: `Room ${booking.roomId.roomNumber}`
     })
     setIsBookingDialogOpen(false)
   }
-  
-  // Process payment and create order
-  const processPayment = async (orderDetails: OrderDetails) => {
-    setIsProcessing(true);
+
+  // Process order
+  const processOrder = async (orderDetails: OrderDetails) => {
+    setIsProcessing(true)
     try {
+<<<<<<< HEAD
       // 1. Process payment
       const paymentResponse = await fetch("http://localhost:8000/api/restaurants/payments/process", {
         method: "POST",
@@ -204,6 +224,8 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       }
       
       // 2. Create order with payment information
+=======
+>>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
       const orderResponse = await fetch(`http://localhost:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
         method: "POST",
         headers: {
@@ -226,29 +248,33 @@ export default function Checkout({ order, onComplete, onBack } : any) {
             modifiers: item.modifiers,
             subtotal: item.price * item.quantity
           })),
-          tableNumber: diningOption === "dine-in" ? tableNumber : undefined,
-          type: diningOption.toUpperCase(),
-          paymentMethod: paymentMethod.toUpperCase(),
+          tableNumber: selectedTable?.tableNumber,
+          type: "ROOM",
+          paymentMethod: "ROOM",
           specialInstructions: orderDetails.specialInstructions,
           payment: {
-            method: paymentMethod.toLowerCase(),
-            status: "PAID",
+            method: "room",
+            status: "PENDING",
             amount: orderDetails.total,
             tax: orderDetails.tax,
-            tip: orderDetails.tip || 0,
-            transactionId: paymentData.data.transactionId
+            tip: orderDetails.tip || 0
           }
         }),
-      });
+      })
       
-      const orderData = await orderResponse.json();
+      const orderData = await orderResponse.json()
       
       if (!orderData.success) {
-        throw new Error(orderData.message || "Order creation failed");
+        throw new Error(orderData.message || "Order creation failed")
       }
       
+<<<<<<< HEAD
       // 3. If charging to room, create room service charge
       if (paymentMethod === "room" && selectedBooking) {
+=======
+      // Create room service charge
+      if (selectedBooking) {
+>>>>>>> d0e37ebdb043190be077f21263f4e9fadf38c5cc
         const roomServiceResponse = await fetch("http://localhost:8000/api/v1/room-service/charge", {
           method: "POST",
           headers: {
@@ -259,7 +285,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
             bookingId: selectedBooking._id,
             roomId: selectedBooking.roomId._id,
             orderId: orderData.data._id,
-            hotelId: "67e8f522404a64803d0cea8d", // Replace with actual hotelId
+            hotelId: "67e8f522404a64803d0cea8d",
             amount: orderDetails.total
           })
         })
@@ -270,40 +296,35 @@ export default function Checkout({ order, onComplete, onBack } : any) {
         }
       }
       
-      setIsPaymentSuccessful(true);
+      setIsPaymentSuccessful(true)
       
-      // Short delay to show success state before completing
       setTimeout(() => {
         onComplete({
           ...orderDetails,
           orderId: orderData.data._id,
-          orderNumber: orderData.data.orderNumber,
-          paymentId: paymentData.data.paymentId,
-          paymentStatus: paymentData.data.status,
-          transactionId: paymentData.data.transactionId,
-        });
-      }, 1500);
+          orderNumber: orderData.data.orderNumber
+        })
+      }, 1500)
       
     } catch (error) {
-      console.error("Error processing payment:", error);
+      console.error("Error processing order:", error)
       toast({
-        title: "Payment Failed",
-        description: error instanceof Error ? error.message : "There was an error processing your payment. Please try again.",
+        title: "Order Failed",
+        description: error instanceof Error ? error.message : "There was an error processing your order. Please try again.",
         variant: "destructive",
-      });
-      setIsProcessing(false);
+      })
+      setIsProcessing(false)
     }
-  };
+  }
 
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     
-    // Validate customer info
-    if (!customerInfo.name || !customerInfo.phone) {
+    if (!selectedBooking) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in at least name and phone number",
+        title: "Room Required",
+        description: "Please select a room to charge the order to",
         variant: "destructive",
       })
       return
@@ -311,541 +332,306 @@ export default function Checkout({ order, onComplete, onBack } : any) {
 
     const orderDetails: OrderDetails = {
       ...order,
-      customer: customerInfo,
-      diningOption,
-      tableNumber: diningOption === "dine-in" ? tableNumber : null,
-      paymentMethod,
+      paymentMethod: "room",
       orderNumber: Math.floor(1000 + Math.random() * 9000),
       timestamp: new Date().toISOString(),
     }
 
-    await processPayment(orderDetails)
-  }
-
-  // Handle card detail changes
-  const handleCardDetailChange = (field: string, value: string) => {
-    setCardDetails(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    await processOrder(orderDetails)
   }
 
   if (!order) return null
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <Button variant="ghost" size="sm" onClick={onBack} className="mb-6" disabled={isProcessing}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Order
-      </Button>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-6 text-xl">
+        <Button variant="ghost" size="sm" onClick={onBack} className="mb-6" disabled={isProcessing}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Order
+        </Button>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
-              <CardDescription>Review your order before payment</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="space-y-4">
-                  {order.items.map((item: OrderItem, index: number) => (
-                    <div key={index} className="flex justify-between">
-                      <div>
-                        <div className="font-medium">
-                          {item.quantity}x {item.name}
-                        </div>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          {item.size && <span>Size: {item.size.charAt(0).toUpperCase() + item.size.slice(1)}</span>}
-                          {item.addons && item.addons.length > 0 && <div>Add-ons: {item.addons.join(", ")}</div>}
-                          {item.cookingPreference && <div>Cooking: {item.cookingPreference}</div>}
-                          {item.specialInstructions && <div>Note: {item.specialInstructions}</div>}
-                        </div>
-                      </div>
-                      <div className="font-medium">${(item.price * item.quantity).toFixed(2)}</div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-
-              <Separator className="my-4" />
-
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>${order.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax (8%)</span>
-                  <span>${order.tax.toFixed(2)}</span>
-                </div>
-                {order.discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>-${order.discount.toFixed(2)}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>${order.total.toFixed(2)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <form onSubmit={handleSubmit}>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Left Column - Order Summary */}
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Checkout</CardTitle>
-                <CardDescription>Complete your order</CardDescription>
+                <CardTitle>Order Summary</CardTitle>
+                <CardDescription>Review your order details</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Customer Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-name">Name *</Label>
-                      <Input
-                        id="customer-name"
-                        placeholder="Enter customer name"
-                        value={customerInfo.name}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-phone">Phone *</Label>
-                      <Input
-                        id="customer-phone"
-                        placeholder="Enter phone number"
-                        value={customerInfo.phone}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-email">Email</Label>
-                      <Input
-                        id="customer-email"
-                        type="email"
-                        placeholder="Enter email address"
-                        value={customerInfo.email}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-address">Address</Label>
-                      <Input
-                        id="customer-address"
-                        placeholder="Enter delivery address"
-                        value={customerInfo.address}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                      />
-                    </div>
+              <CardContent>
+                <ScrollArea className="h-[400px] pr-4">
+                  <div className="space-y-4">
+                    {order.items.map((item: OrderItem, index: number) => (
+                      <div key={index} className="flex justify-between">
+                        <div>
+                          <div className="font-medium">
+                            {item.quantity}x {item.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            {item.size && <span>Size: {item.size.charAt(0).toUpperCase() + item.size.slice(1)}</span>}
+                            {item.addons && item.addons.length > 0 && <div>Add-ons: {item.addons.join(", ")}</div>}
+                            {item.cookingPreference && <div>Cooking: {item.cookingPreference}</div>}
+                            {item.specialInstructions && <div>Note: {item.specialInstructions}</div>}
+                          </div>
+                        </div>
+                        <div className="font-medium">${(item.price * item.quantity).toFixed(2)}</div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                </ScrollArea>
+
+                <Separator className="my-4" />
 
                 <div className="space-y-2">
-                  <Label>Dining Option</Label>
-                  <RadioGroup 
-                    value={diningOption} 
-                    onValueChange={setDiningOption} 
-                    className="grid grid-cols-3 gap-4"
-                    disabled={isProcessing}
-                  >
-                    <div>
-                      <RadioGroupItem value="dine-in" id="dine-in" className="peer sr-only" />
-                      <Label
-                        htmlFor="dine-in"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-blue-50 hover:text-blue-700 peer-data-[state=checked]:border-blue-600 peer-data-[state=checked]:bg-blue-50 peer-data-[state=checked]:text-blue-700 [&:has([data-state=checked])]:border-blue-600 [&:has([data-state=checked])]:bg-blue-50 [&:has([data-state=checked])]:text-blue-700"
-                      >
-                        <Users className="mb-3 h-6 w-6" />
-                        Dine-In
-                      </Label>
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>${order.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax (8%)</span>
+                    <span>${order.tax.toFixed(2)}</span>
+                  </div>
+                  {order.discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount</span>
+                      <span>-${order.discount.toFixed(2)}</span>
                     </div>
-                    <div>
-                      <RadioGroupItem value="takeaway" id="takeaway" className="peer sr-only" />
-                      <Label
-                        htmlFor="takeaway"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                      >
-                        <Home className="mb-3 h-6 w-6" />
-                        Takeaway
-                      </Label>
-                    </div>
-                    <div>
-                      <RadioGroupItem value="delivery" id="delivery" className="peer sr-only" />
-                      <Label
-                        htmlFor="delivery"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
-                      >
-                        <Truck className="mb-3 h-6 w-6" />
-                        Delivery
-                      </Label>
-                    </div>
-                  </RadioGroup>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span>${order.total.toFixed(2)}</span>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                {diningOption === "dine-in" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="table-number">Table Number</Label>
-                    <div className="flex gap-2 items-center">
-                      <Button 
-                        type="button" 
-                        onClick={handleOpenTableDialog} 
-                        className="flex-1" 
-                        variant="outline"
-                        disabled={isProcessing}
-                      >
-                        {tableNumber ? `Table ${tableNumber}` : "Select a Table"}
-                      </Button>
-                      {tableNumber && (
+          {/* Right Column - Room Selection and Table Selection */}
+          <div className="space-y-6">
+            <form onSubmit={handleSubmit}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Order Details</CardTitle>
+                  <CardDescription>Select room and table information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Room Selection */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Room Information</h3>
+                      {selectedBooking && (
                         <Button 
-                          type="button" 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => setTableNumber("")}
+                          onClick={() => setSelectedBooking(null)}
                           disabled={isProcessing}
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
-
-                    <Dialog open={isTableDialogOpen} onOpenChange={setIsTableDialogOpen}>
-                      <DialogContent className="max-w-3xl max-h-[80vh]">
-                        <DialogHeader>
-                          <DialogTitle>Select a Table</DialogTitle>
-                          <DialogDescription>Choose an available table from the floor plan</DialogDescription>
-                        </DialogHeader>
-                        <ScrollArea className="h-[500px] pr-4">
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg">
-                            {tables.map((table: Table) => (
-                              <div
-                                key={table._id}
-                                onClick={() => table.status === "available" && handleSelectTable(table.tableNumber)}
-                                className={`
-                                  relative p-4 border-2 rounded-lg transition-all
-                                  ${table.status === "available" 
-                                    ? "border-green-500 hover:bg-green-50 cursor-pointer" 
-                                    : "border-red-300 bg-red-50 cursor-not-allowed"}
-                                `}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <h3 className="font-bold text-lg">{table.tableNumber}</h3>
-                                    <p className="text-sm text-muted-foreground">{table.location}</p>
-                                  </div>
-                                  <Badge variant={table.status === "available" ? "outline" : "destructive"}>
-                                    {table.status}
-                                  </Badge>
-                                </div>
-                                <div className="mt-2">
-                                  <p className="text-sm">Capacity: {table.capacity} people</p>
-                                  <div className="mt-1 flex flex-wrap gap-1">
-                                    {table.features.map((feature, idx) => (
-                                      <Badge key={idx} variant="secondary" className="text-xs">
-                                        {feature}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                                {table.status === "available" && (
-                                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-green-500/10 rounded-lg">
-                                    <Button size="sm">Select</Button>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                        <div className="flex justify-end gap-2">
-                          <DialogClose asChild>
-                            <Button variant="outline">Cancel</Button>
-                          </DialogClose>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                )}
-
-                {diningOption === "delivery" && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="customer-name">Name</Label>
-                        <Input
-                          id="customer-name"
-                          value={customerInfo.name}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
-                          placeholder="Full name"
-                          required
-                          disabled={isProcessing}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="customer-phone">Phone</Label>
-                        <Input
-                          id="customer-phone"
-                          value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                          placeholder="Phone number"
-                          required
-                          disabled={isProcessing}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-email">Email</Label>
-                      <Input
-                        id="customer-email"
-                        value={customerInfo.email}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                        placeholder="Email address"
-                        type="email"
-                        disabled={isProcessing}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customer-address">Delivery Address</Label>
-                      <Input
-                        id="customer-address"
-                        value={customerInfo.address}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                        placeholder="Full address"
-                        required
-                        disabled={isProcessing}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Payment Method</Label>
-                  <Tabs value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <TabsList className="grid grid-cols-5 h-auto">
-                      <TabsTrigger
-                        value="cash"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                        disabled={isProcessing}
-                      >
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Cash
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="card"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                        disabled={isProcessing}
-                      >
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Card
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="wallet"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                        disabled={isProcessing}
-                      >
-                        <Wallet className="h-4 w-4 mr-2" />
-                        Wallet
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="qr"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                        disabled={isProcessing}
-                      >
-                        <QrCode className="h-4 w-4 mr-2" />
-                        QR
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="room"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                        disabled={isProcessing}
-                      >
-                        <Home className="h-4 w-4 mr-2" />
-                        Room
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="cash" className="pt-4">
+                    
+                    {selectedBooking ? (
                       <Card>
                         <CardContent className="pt-4">
-                          <p className="text-sm text-muted-foreground">Payment will be collected at the counter.</p>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="card" className="pt-4">
-                      <Card>
-                        <CardContent className="pt-4 space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="card-number">Card Number</Label>
-                            <Input 
-                              id="card-number" 
-                              placeholder="1234 5678 9012 3456" 
-                              value={cardDetails.cardNumber}
-                              onChange={(e) => handleCardDetailChange('cardNumber', e.target.value)}
-                              disabled={isProcessing}
-                            />
-                          </div>
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className="space-y-2 col-span-2">
-                              <Label htmlFor="expiry">Expiry Date</Label>
-                              <Input 
-                                id="expiry" 
-                                placeholder="MM/YY" 
-                                value={cardDetails.expiryDate}
-                                onChange={(e) => handleCardDetailChange('expiryDate', e.target.value)}
-                                disabled={isProcessing}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="cvv">CVV</Label>
-                              <Input 
-                                id="cvv" 
-                                placeholder="123" 
-                                value={cardDetails.cvv}
-                                onChange={(e) => handleCardDetailChange('cvv', e.target.value)}
-                                disabled={isProcessing}
-                              />
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-medium">Room {selectedBooking.roomId.roomNumber}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Guest: {selectedBooking.guestId.personalInfo.firstName} {selectedBooking.guestId.personalInfo.lastName}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Check-in: {new Date(selectedBooking.checkIn).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Badge variant="outline">
+                                {selectedBooking.status}
+                              </Badge>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
-                    </TabsContent>
+                    ) : (
+                      <Button 
+                        onClick={handleOpenBookingDialog} 
+                        variant="outline"
+                        className="w-full py-8"
+                        disabled={isProcessing}
+                      >
+                        <Home className="mr-2 h-5 w-5" />
+                        Select Room
+                      </Button>
+                    )}
+                  </div>
 
-                    <TabsContent value="wallet" className="pt-4">
+                  {/* Table Selection */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Table Information</h3>
+                      {selectedTable && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => setSelectedTable(null)}
+                          disabled={isProcessing}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {selectedTable ? (
                       <Card>
                         <CardContent className="pt-4">
-                          <p className="text-sm text-muted-foreground">
-                            Select your digital wallet to proceed with payment.
-                          </p>
-                          <div className="grid grid-cols-3 gap-2 mt-4">
-                            <Button variant="outline" className="flex items-center justify-center h-14" disabled={isProcessing}>
-                              Apple Pay
-                            </Button>
-                            <Button variant="outline" className="flex items-center justify-center h-14" disabled={isProcessing}>
-                              Google Pay
-                            </Button>
-                            <Button variant="outline" className="flex items-center justify-center h-14" disabled={isProcessing}>
-                              PayPal
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="qr" className="pt-4">
-                      <Card>
-                        <CardContent className="pt-4 flex justify-center">
-                          <div className="w-48 h-48 bg-muted flex items-center justify-center">
-                            <QrCode className="h-24 w-24 text-muted-foreground" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="room" className="pt-4">
-                      <Card>
-                        <CardContent className="pt-4">
-                          {selectedBooking ? (
-                            <div className="space-y-4">
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <h3 className="font-medium">Room {selectedBooking.roomId.roomNumber}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Guest: {selectedBooking.guestId.firstName} {selectedBooking.guestId.lastName}
-                                  </p>
-                                </div>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  onClick={() => setSelectedBooking(null)}
-                                  disabled={isProcessing}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="font-medium">Table {selectedTable.tableNumber}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Location: {selectedTable.location}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Capacity: {selectedTable.capacity} people
+                                </p>
                               </div>
+                              <Badge variant="outline">
+                                {selectedTable.status}
+                              </Badge>
                             </div>
-                          ) : (
-                            <div className="text-center">
-                              <Button 
-                                onClick={handleOpenBookingDialog} 
-                                variant="outline"
-                                disabled={isProcessing}
-                              >
-                                Select Room
-                              </Button>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {selectedTable.features.map((feature, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {feature}
+                                </Badge>
+                              ))}
                             </div>
-                          )}
+                          </div>
                         </CardContent>
                       </Card>
-
-                      <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
-                        <DialogContent className="max-w-3xl">
-                          <DialogHeader>
-                            <DialogTitle>Select a Room</DialogTitle>
-                            <DialogDescription>Choose from active bookings</DialogDescription>
-                          </DialogHeader>
-                          <div className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto">
-                            {activeBookings.map((booking) => (
-                              <div
-                                key={booking._id}
-                                onClick={() => handleSelectBooking(booking)}
-                                className="p-4 border rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer"
-                              >
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <h3 className="font-medium">Room {booking.roomId.roomNumber}</h3>
-                                    <Badge variant={booking.status === "checked_in" ? "outline" : "secondary"}>
-                                      {booking.status}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    Guest: {booking.guestId.firstName} {booking.guestId.lastName}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Check-in: {new Date(booking.checkIn).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <DialogClose asChild>
-                            <Button variant="outline">Cancel</Button>
-                          </DialogClose>
-                        </DialogContent>
-                      </Dialog>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  type="submit" 
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={isProcessing || isPaymentSuccessful}
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isPaymentSuccessful ? "Payment Successful" : "Processing Payment..."}
-                    </>
-                  ) : isPaymentSuccessful ? (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Payment Successful
-                    </>
-                  ) : (
-                    "Confirm & Pay"
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-          </form>
+                    ) : (
+                      <Button 
+                        onClick={handleOpenTableDialog} 
+                        variant="outline"
+                        className="w-full py-8"
+                        disabled={isProcessing}
+                      >
+                        <Users className="mr-2 h-5 w-5" />
+                        Select Table
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    type="submit" 
+                    className="w-full p-10 bg-blue-600 hover:bg-blue-700 text-white text-xl"
+                    disabled={isProcessing || isPaymentSuccessful || !selectedBooking}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {isPaymentSuccessful ? "Order Confirmed" : "Processing Order..."}
+                      </>
+                    ) : isPaymentSuccessful ? (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Order Confirmed
+                      </>
+                    ) : (
+                      "Confirm Order"
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </form>
+          </div>
         </div>
       </div>
+
+      {/* Room Selection Dialog */}
+      <Dialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Select a Room</DialogTitle>
+            <DialogDescription>Choose from active bookings</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
+            {activeBookings.map((booking) => (
+              <div
+                key={booking._id}
+                onClick={() => handleSelectBooking(booking)}
+                className="p-4 border rounded-lg hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all"
+              >
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <h3 className="font-medium">Room {booking.roomId.roomNumber}</h3>
+                    <Badge variant={booking.status === "checked_in" ? "outline" : "secondary"}>
+                      {booking.status}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Guest: {booking.guestId.personalInfo.firstName} {booking.guestId.personalInfo.lastName}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Check-in: {new Date(booking.checkIn).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
+
+      {/* Table Selection Dialog */}
+      <Dialog open={isTableDialogOpen} onOpenChange={setIsTableDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Select a Table</DialogTitle>
+            <DialogDescription>Choose an available table from the floor plan</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto p-4">
+            {tables.map((table) => (
+              <div
+                key={table._id}
+                onClick={() => table.status === "available" && handleSelectTable(table)}
+                className={`
+                  relative p-4 border-2 rounded-lg transition-all
+                  ${table.status === "available" 
+                    ? "border-green-500 hover:bg-green-50 cursor-pointer" 
+                    : "border-red-300 bg-red-50 cursor-not-allowed"}
+                `}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-lg">Table {table.tableNumber}</h3>
+                    <p className="text-sm text-muted-foreground">{table.location}</p>
+                  </div>
+                  <Badge variant={table.status === "available" ? "outline" : "destructive"}>
+                    {table.status}
+                  </Badge>
+                </div>
+                <div className="mt-2">
+                  <p className="text-sm">Capacity: {table.capacity} people</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {table.features.map((feature, idx) => (
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {feature}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

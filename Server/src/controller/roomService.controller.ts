@@ -13,7 +13,7 @@ export const getActiveBookings = async (req: Request, res: Response) => {
       status: { $in: [BookingStatus.BOOKED, BookingStatus.CHECKED_IN] }
     })
     .populate('roomId', 'roomNumber floor')
-    .populate('guestId', 'firstName lastName')
+    .populate('guestId', 'personalInfo.firstName personalInfo.lastName personalInfo.email personalInfo.phone personalInfo.address')
     .select('roomId guestId checkIn expectedCheckOut status')
 
     res.status(200).json({

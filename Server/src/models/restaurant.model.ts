@@ -56,7 +56,8 @@ enum PaymentMethod {
   DEBIT_CARD = 'debit_card',
   MOBILE_PAYMENT = 'mobile_payment',
   ONLINE = 'online',
-  GIFT_CARD = 'gift_card'
+  GIFT_CARD = 'gift_card',
+  ROOM = 'room'
 }
 
 // New enum for payment status
@@ -86,6 +87,7 @@ interface OperatingHours {
 
 // Interface for table
 interface Table {
+  _id: Types.ObjectId;
   tableNumber: string;
   capacity: number;
   location: 'indoor' | 'outdoor' | 'bar';
