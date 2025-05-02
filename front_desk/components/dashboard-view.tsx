@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Bell, Calendar, CheckSquare, CreditCard, Home, LogOut, Search, Settings, Users } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Bell, Calendar, CheckSquare, CreditCard, Home, LogOut, Search, Settings, Users, X } from "lucide-react"
 
 import { CheckInView } from "@/components/check-in-view"
 import { CheckOutView } from "@/components/check-out-view"
@@ -23,8 +23,152 @@ import {
 } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import img from '../public/is_logo1 (1).webp'
+
+interface Guest {
+  id: string
+  name: string
+  time?: string
+  room?: string
+}
+
+interface RoomStatus {
+  available: number
+  occupied: number
+  cleaning: number
+  maintenance: number
+}
+
+interface Reservation {
+  id: string
+  name: string
+  roomType: string
+  nights: number
+  time: string
+  status: string
+}
+
+interface UpcomingReservations {
+  tomorrow: Reservation[]
+  day2: Reservation[]
+  day3: Reservation[]
+}
+
+interface DashboardData {
+  todayCheckIns: Guest[]
+  todayCheckOuts: Guest[]
+  roomStatus: RoomStatus
+  upcomingReservations: UpcomingReservations
+}
+
 export function DashboardView() {
   const [activeView, setActiveView] = useState("dashboard")
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
+    todayCheckIns: [],
+    todayCheckOuts: [],
+    roomStatus: {
+      available: 0,
+      occupied: 0,
+      cleaning: 0,
+      maintenance: 0
+    },
+    upcomingReservations: {
+      tomorrow: [],
+      day2: [],
+      day3: []
+    }
+  })
+  const [loading, setLoading] = useState(true)
+
+  // Search bar state
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+
+  // Handle search input change
+  const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value)
+    if (e.target.value === "") {
+      setShowSearchResults(false)
+      setSearchResults([])
+    }
+  }
+
+  // Handle search submit (Enter key or icon click)
+  const handleSearchSubmit = async (e?: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent) => {
+    if (e && "key" in e && e.key !== "Enter") return
+    if (!searchQuery.trim()) return
+    setSearchLoading(true)
+    setShowSearchResults(true)
+    setSearchResults([])
+    try {
+      const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const data = await res.json()
+      const results: any[] = []
+      if (data.guests && data.guests.length > 0) {
+        results.push({ group: 'Guests', items: data.guests.map((g: any) => ({
+          type: 'Guest',
+          id: g._id,
+          name: `${g.personalInfo?.firstName || g.firstName || ''} ${g.personalInfo?.lastName || g.lastName || ''}`.trim() || g.email || g.phone || g.idNumber,
+          email: g.personalInfo?.email || g.email,
+          phone: g.personalInfo?.phone || g.phone
+        })) })
+      }
+      if (data.rooms && data.rooms.length > 0) {
+        results.push({ group: 'Rooms', items: data.rooms.map((r: any) => ({
+          type: 'Room',
+          id: r._id,
+          name: `Room ${r.roomNumber}`,
+          roomNumber: r.roomNumber,
+          status: r.status
+        })) })
+      }
+      if (data.reservations && data.reservations.length > 0) {
+        results.push({ group: 'Reservations', items: data.reservations.map((res: any) => ({
+          type: 'Reservation',
+          id: res._id,
+          name: `Reservation #${res._id}`,
+          guest: res.guestId,
+          room: res.roomId,
+          status: res.status
+        })) })
+      }
+      setSearchResults(results)
+    } catch (err) {
+      setSearchResults([])
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  // Handle result click (navigate or set view)
+  const handleResultClick = (result: any) => {
+    setShowSearchResults(false)
+    setSearchQuery("")
+    // Example: set view based on type
+    if (result.type === "Guest") setActiveView("guest-history")
+    else if (result.type === "Room") setActiveView("room-management")
+    else if (result.type === "Reservation") setActiveView("check-in")
+  }
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/dashboard')
+        const data = await response.json()
+        setDashboardData(data)
+        setLoading(false)
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+    // Refresh data every 5 minutes
+    const interval = setInterval(fetchDashboardData, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const renderActiveView = () => {
     switch (activeView) {
@@ -44,6 +188,10 @@ export function DashboardView() {
   }
 
   const renderDashboard = () => {
+    if (loading) {
+      return <div className="flex items-center justify-center h-full">Loading...</div>
+    }
+
     return (
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-4 md:flex-row">
@@ -53,9 +201,9 @@ export function DashboardView() {
               <CardDescription>Guests arriving today</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">12</div>
+              <div className="text-3xl font-bold">{dashboardData.todayCheckIns.length}</div>
               <div className="mt-4 space-y-2">
-                {todayCheckIns.map((guest) => (
+                {dashboardData.todayCheckIns.map((guest) => (
                   <div key={guest.id} className="flex items-center justify-between rounded-lg border p-2">
                     <div>
                       <div className="font-medium">{guest.name}</div>
@@ -78,9 +226,9 @@ export function DashboardView() {
               <CardDescription>Guests departing today</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">8</div>
+              <div className="text-3xl font-bold">{dashboardData.todayCheckOuts.length}</div>
               <div className="mt-4 space-y-2">
-                {todayCheckOuts.map((guest) => (
+                {dashboardData.todayCheckOuts.map((guest) => (
                   <div key={guest.id} className="flex items-center justify-between rounded-lg border p-2">
                     <div>
                       <div className="font-medium">{guest.name}</div>
@@ -109,19 +257,19 @@ export function DashboardView() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-lg bg-green-100 p-4 text-center dark:bg-green-900">
                   <div className="text-sm font-medium text-green-800 dark:text-green-100">Available</div>
-                  <div className="text-2xl font-bold text-green-800 dark:text-green-100">24</div>
+                  <div className="text-2xl font-bold text-green-800 dark:text-green-100">{dashboardData.roomStatus.available}</div>
                 </div>
                 <div className="rounded-lg bg-red-100 p-4 text-center dark:bg-red-900">
                   <div className="text-sm font-medium text-red-800 dark:text-red-100">Occupied</div>
-                  <div className="text-2xl font-bold text-red-800 dark:text-red-100">42</div>
+                  <div className="text-2xl font-bold text-red-800 dark:text-red-100">{dashboardData.roomStatus.occupied}</div>
                 </div>
                 <div className="rounded-lg bg-yellow-100 p-4 text-center dark:bg-yellow-900">
                   <div className="text-sm font-medium text-yellow-800 dark:text-yellow-100">Cleaning</div>
-                  <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-100">8</div>
+                  <div className="text-2xl font-bold text-yellow-800 dark:text-yellow-100">{dashboardData.roomStatus.cleaning}</div>
                 </div>
                 <div className="rounded-lg bg-blue-100 p-4 text-center dark:bg-blue-900">
                   <div className="text-sm font-medium text-blue-800 dark:text-blue-100">Maintenance</div>
-                  <div className="text-2xl font-bold text-blue-800 dark:text-blue-100">2</div>
+                  <div className="text-2xl font-bold text-blue-800 dark:text-blue-100">{dashboardData.roomStatus.maintenance}</div>
                 </div>
               </div>
               <Button variant="outline" className="mt-4 w-full" onClick={() => setActiveView("room-management")}>
@@ -136,22 +284,8 @@ export function DashboardView() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {notifications.map((notification) => (
-                  <div key={notification.id} className="flex items-start gap-2 rounded-lg border p-2">
-                    <div
-                      className={`mt-0.5 h-2 w-2 rounded-full ${
-                        notification.priority === "high" ? "bg-red-500" : "bg-yellow-500"
-                      }`}
-                    />
-                    <div>
-                      <div className="font-medium">
-                        Room {notification.room} - {notification.type}
-                      </div>
-                      <div className="text-sm text-muted-foreground">{notification.message}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{notification.time}</div>
-                    </div>
-                  </div>
-                ))}
+                {/* Notifications will be implemented separately */}
+                <div className="text-center text-muted-foreground">No notifications at this time</div>
               </div>
             </CardContent>
           </Card>
@@ -171,7 +305,7 @@ export function DashboardView() {
               </TabsList>
               <TabsContent value="tomorrow" className="mt-4">
                 <div className="space-y-2">
-                  {upcomingReservations.tomorrow.map((reservation) => (
+                  {dashboardData.upcomingReservations.tomorrow.map((reservation) => (
                     <div key={reservation.id} className="flex items-center justify-between rounded-lg border p-3">
                       <div>
                         <div className="font-medium">{reservation.name}</div>
@@ -189,7 +323,7 @@ export function DashboardView() {
               </TabsContent>
               <TabsContent value="day2" className="mt-4">
                 <div className="space-y-2">
-                  {upcomingReservations.day2.map((reservation) => (
+                  {dashboardData.upcomingReservations.day2.map((reservation) => (
                     <div key={reservation.id} className="flex items-center justify-between rounded-lg border p-3">
                       <div>
                         <div className="font-medium">{reservation.name}</div>
@@ -207,7 +341,7 @@ export function DashboardView() {
               </TabsContent>
               <TabsContent value="day3" className="mt-4">
                 <div className="space-y-2">
-                  {upcomingReservations.day3.map((reservation) => (
+                  {dashboardData.upcomingReservations.day3.map((reservation) => (
                     <div key={reservation.id} className="flex items-center justify-between rounded-lg border p-3">
                       <div>
                         <div className="font-medium">{reservation.name}</div>
@@ -231,15 +365,14 @@ export function DashboardView() {
   }
 
   return (
-    <SidebarProvider  >
-      <div className="flex min-h-screen"  >
-        <Sidebar >
-        <SidebarHeader className="border-b p-4">
-  <div className="flex items-center gap-2">
-
-    <img src="https://res.cloudinary.com/dwyyrm9xw/image/upload/v1744358318/wqc4hcdz0esi42jsijro.png" alt="" className="" />
-  </div>
-</SidebarHeader>
+    <SidebarProvider>
+      <div className="flex min-h-screen">
+        <Sidebar>
+          <SidebarHeader className="border-b p-4">
+            <div className="flex items-center gap-2">
+              <img src="https://res.cloudinary.com/dwyyrm9xw/image/upload/v1744358318/wqc4hcdz0esi42jsijro.png" alt="" className="" />
+            </div>
+          </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -324,10 +457,43 @@ export function DashboardView() {
         <div className="flex-1 max-w-full">
           <header className="sticky top-0 z-10 border-b bg-background">
             <div className="flex h-16 items-center justify-between px-6">
-              <div className="flex items-center gap-4 md:w-1/3">
+              <div className="flex items-center gap-4 md:w-1/3 relative">
                 <div className="relative w-full max-w-md">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input type="search" placeholder="Search guests, rooms, or reservations..." className="w-full pl-8" />
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground cursor-pointer" onClick={handleSearchSubmit} />
+                  <Input
+                    type="search"
+                    placeholder="Search guests, rooms, or reservations..."
+                    className="w-full pl-8"
+                    value={searchQuery}
+                    onChange={handleSearchInput}
+                    onKeyDown={handleSearchSubmit}
+                    onFocus={() => searchQuery && setShowSearchResults(true)}
+                  />
+                  {showSearchResults && (
+                    <div className="absolute left-0 right-0 mt-2 bg-white border rounded shadow-lg z-50 max-h-60 overflow-auto">
+                      {searchLoading ? (
+                        <div className="p-4 text-center text-muted-foreground">Searching...</div>
+                      ) : searchResults.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground">No results found</div>
+                      ) : (
+                        searchResults.map((group, gIdx) => (
+                          <div key={gIdx}>
+                            <div className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase">{group.group}</div>
+                            {group.items.map((result: any, idx: number) => (
+                              <div
+                                key={result.id}
+                                className="p-3 hover:bg-blue-100 cursor-pointer flex items-center justify-between"
+                                onClick={() => handleResultClick(result)}
+                              >
+                                <span>{result.name}</span>
+                                <X className="h-4 w-4 text-muted-foreground" onClick={e => { e.stopPropagation(); setShowSearchResults(false); }} />
+                              </div>
+                            ))}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -335,12 +501,12 @@ export function DashboardView() {
                   <Bell className="h-4 w-4" />
                   <span className="hidden md:inline">Notifications</span>
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                    3
+                    0
                   </span>
                 </Button>
                 <div className="hidden md:block">
-                  <div className="text-sm font-medium">March 10, 2025</div>
-                  <div className="text-xs text-muted-foreground">Monday, 5:24 PM</div>
+                  <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
+                  <div className="text-xs text-muted-foreground">{new Date().toLocaleTimeString()}</div>
                 </div>
               </div>
             </div>
@@ -366,123 +532,12 @@ export function DashboardView() {
               </div>
             </div>
           </header>
-          <main  className=" p-6 min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 bg-no-repeat bg-cover">{renderActiveView()}</main>
+          <main className="p-6 min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 bg-no-repeat bg-cover">
+            {renderActiveView()}
+          </main>
         </div>
       </div>
     </SidebarProvider>
   )
-}
-
-// Sample data
-const todayCheckIns = [
-  { id: 1, name: "Michael Johnson", time: "2:00 PM" },
-  { id: 2, name: "Sarah Williams", time: "3:30 PM" },
-  { id: 3, name: "David Brown", time: "5:45 PM" },
-]
-
-const todayCheckOuts = [
-  { id: 1, name: "Emily Davis", room: "204" },
-  { id: 2, name: "Robert Wilson", room: "315" },
-  { id: 3, name: "Jennifer Taylor", room: "127" },
-]
-
-const notifications = [
-  {
-    id: 1,
-    room: "302",
-    type: "Maintenance Request",
-    message: "AC not working properly",
-    time: "10 minutes ago",
-    priority: "high",
-  },
-  {
-    id: 2,
-    room: "215",
-    type: "Room Service",
-    message: "Extra towels requested",
-    time: "25 minutes ago",
-    priority: "medium",
-  },
-  {
-    id: 3,
-    room: "118",
-    type: "Housekeeping",
-    message: "Room ready for cleaning",
-    time: "45 minutes ago",
-    priority: "medium",
-  },
-]
-
-const upcomingReservations = {
-  tomorrow: [
-    {
-      id: 1,
-      name: "Thomas Anderson",
-      roomType: "Deluxe King",
-      nights: 3,
-      time: "2:00 PM",
-      status: "Confirmed",
-    },
-    {
-      id: 2,
-      name: "Jessica Martinez",
-      roomType: "Standard Double",
-      nights: 2,
-      time: "3:30 PM",
-      status: "Confirmed",
-    },
-    {
-      id: 3,
-      name: "Christopher Lee",
-      roomType: "Executive Suite",
-      nights: 5,
-      time: "4:15 PM",
-      status: "Pending",
-    },
-  ],
-  day2: [
-    {
-      id: 4,
-      name: "Amanda Clark",
-      roomType: "Deluxe Queen",
-      nights: 2,
-      time: "1:00 PM",
-      status: "Confirmed",
-    },
-    {
-      id: 5,
-      name: "Daniel White",
-      roomType: "Standard King",
-      nights: 4,
-      time: "2:45 PM",
-      status: "Confirmed",
-    },
-  ],
-  day3: [
-    {
-      id: 6,
-      name: "Michelle Rodriguez",
-      roomType: "Junior Suite",
-      nights: 3,
-      time: "12:30 PM",
-      status: "Confirmed",
-    },
-    {
-      id: 7,
-      name: "Kevin Thompson",
-      roomType: "Deluxe Twin",
-      nights: 1,
-      time: "3:00 PM",
-      status: "Pending",
-    },
-    {
-      id: 8,
-      name: "Laura Garcia",
-      roomType: "Standard Queen",
-      nights: 2,
-      time: "4:30 PM",
-      status: "Confirmed",
-    },
-  ],
 }
 

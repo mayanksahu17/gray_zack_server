@@ -105,7 +105,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const fetchTables = async () => {
     try {
       const response = await fetch(
-        "http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
+        "http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
       )
       const data = await response.json()
       if (data.success) {
@@ -126,7 +126,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     
     try {
       const response = await fetch(
-        `http://16.171.47.60:8000/api/v1/room-service/active-bookings/60d21b4667d0d8992e610c85`,
+        `http://localhost:8000/api/v1/room-service/active-bookings/60d21b4667d0d8992e610c85`,
         {
           headers: {
             "Authorization": `Bearer ${localStorage.getItem('token')}`
@@ -182,7 +182,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
     setIsProcessing(true);
     try {
       // 1. Process payment
-      const paymentResponse = await fetch("http://16.171.47.60:8000/api/restaurants/payments/process", {
+      const paymentResponse = await fetch("http://localhost:8000/api/restaurants/payments/process", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -204,7 +204,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       }
       
       // 2. Create order with payment information
-      const orderResponse = await fetch(`http://16.171.47.60:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
+      const orderResponse = await fetch(`http://localhost:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -249,7 +249,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       
       // 3. If charging to room, create room service charge
       if (paymentMethod === "room" && selectedBooking) {
-        const roomServiceResponse = await fetch("http://16.171.47.60:8000/api/v1/room-service/charge", {
+        const roomServiceResponse = await fetch("http://localhost:8000/api/v1/room-service/charge", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

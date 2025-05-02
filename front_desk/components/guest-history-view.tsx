@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { Calendar, CreditCard, Filter, Mail, Phone, User } from "lucide-react"
+import { Calendar, CreditCard, Filter, Mail, Phone, User, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,102 +11,120 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export function GuestHistoryView() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
   const [selectedGuest, setSelectedGuest] = useState<any>(null)
-  const [guests, setGuests] = useState<any[]>([])
   const [stayHistory, setStayHistory] = useState<any[]>([])
   const [billingHistory, setBillingHistory] = useState<any[]>([])
   const [guestNotes, setGuestNotes] = useState<any[]>([])
+  const [error, setError] = useState("")
 
-  useEffect(() => {
-    fetch("http://16.171.47.60:8000/api/v1/guest/hotel/60d21b4667d0d8992e610c85")
-      .then((res) => res.json())
-      .then((data) => setGuests(data))
-      .catch((err) => console.error("Error fetching guest data", err))
-  }, [])
+  // Handle search
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!searchQuery.trim()) return
+    
+    setSearchLoading(true)
+    setShowSearchResults(true)
+    setError("")
+    setSearchResults([])
+    setSelectedGuest(null)
 
-  // Fetch booking history when a guest is selected
-  useEffect(() => {
-    if (selectedGuest?._id) {
-      // Fetch booking history
-      fetch(`http://16.171.47.60:8000/api/v1/booking/guest/${selectedGuest._id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          // Transform booking data to match the stay history format
-          const transformedStayHistory = data.map((booking: any) => ({
-            id: booking._id,
-            checkIn: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            checkOut: new Date(booking.expectedCheckOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            nights: Math.ceil((new Date(booking.expectedCheckOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)),
-            room: booking.roomDetails?.roomNumber || 'N/A',
-            roomType: booking.roomDetails?.type || 'N/A',
-            totalSpent: booking.payment.totalAmount,
-            tags: [
-              booking.status === 'checked_in' ? 'Current Stay' : '',
-              ...booking.addOns.map((addon: any) => addon.name)
-            ].filter(Boolean)
-          }));
+    try {
+      const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const data = await res.json()
+      
+      // Flatten and format search results
+      const results: any[] = []
+      if (data.guests && data.guests.length > 0) {
+        data.guests.forEach((g: any) => results.push({
+          type: 'Guest',
+          id: g._id,
+          name: `${g.personalInfo?.firstName || g.firstName || ''} ${g.personalInfo?.lastName || g.lastName || ''}`.trim(),
+          email: g.personalInfo?.email || g.email,
+          phone: g.personalInfo?.phone || g.phone,
+          guest: g
+        }))
+      }
+      setSearchResults(results)
+    } catch (err) {
+      setError("Failed to search. Please try again.")
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  // Handle guest selection
+  const handleSelect = async (result: any) => {
+    setShowSearchResults(false)
+    setSelectedGuest(result.guest)
+    setError("")
+
+    // Fetch booking history for selected guest
+    try {
+      const bookingRes = await fetch(`http://localhost:8000/api/v1/booking/guest/${result.id}`)
+      const bookingData = await bookingRes.json()
+      
+      if (Array.isArray(bookingData)) {
+        // Transform booking data to match the stay history format
+        const transformedStayHistory = bookingData.map((booking: any) => ({
+          id: booking._id,
+          checkIn: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          checkOut: new Date(booking.expectedCheckOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          nights: Math.ceil((new Date(booking.expectedCheckOut).getTime() - new Date(booking.checkIn).getTime()) / (1000 * 60 * 60 * 24)),
+          room: booking.roomDetails?.roomNumber || 'N/A',
+          roomType: booking.roomDetails?.type || 'N/A',
+          totalSpent: booking.payment.totalAmount,
+          tags: [
+            booking.status === 'checked_in' ? 'Current Stay' : '',
+            ...booking.addOns.map((addon: any) => addon.name)
+          ].filter(Boolean)
+        }));
+        
+        setStayHistory(transformedStayHistory);
+
+        // Transform billing history
+        const transformedBillingHistory = bookingData.flatMap((booking: any) => {
+          const entries = [];
           
-          setStayHistory(transformedStayHistory);
-
-          // Transform billing history
-          const transformedBillingHistory = data.flatMap((booking: any) => {
-            const entries = [];
-            
-            // Add room charge
-            entries.push({
-              id: `room_${booking._id}`,
-              description: `Room Charge - ${booking.roomDetails?.type || 'Room'}`,
-              category: `Room #${booking.roomDetails?.roomNumber || 'N/A'}`,
-              date: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-              paymentMethod: booking.payment.method === 'credit_card' ? 
-                           `Card ending in ${booking.payment.last4Digits || '****'}` : 
-                           booking.payment.method,
-              amount: booking.payment.totalAmount - (booking.addOns?.reduce((sum: number, addon: any) => sum + addon.cost, 0) || 0)
-            });
-
-            // Add add-ons as separate entries
-            booking.addOns?.forEach((addon: any, index: number) => {
-              entries.push({
-                id: `addon_${booking._id}_${index}`,
-                description: addon.name,
-                category: 'Additional Services',
-                date: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                paymentMethod: 'Room Charge',
-                amount: addon.cost
-              });
-            });
-
-            return entries;
+          // Add room charge
+          entries.push({
+            id: `room_${booking._id}`,
+            description: `Room Charge - ${booking.roomDetails?.type || 'Room'}`,
+            category: `Room #${booking.roomDetails?.roomNumber || 'N/A'}`,
+            date: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            paymentMethod: booking.payment.method === 'credit_card' ? 
+                         `Card ending in ${booking.payment.last4Digits || '****'}` : 
+                         booking.payment.method,
+            amount: booking.payment.totalAmount - (booking.addOns?.reduce((sum: number, addon: any) => sum + addon.cost, 0) || 0)
           });
 
-          setBillingHistory(transformedBillingHistory);
-        })
-        .catch((err) => console.error("Error fetching booking history", err));
-    } else {
-      setStayHistory([]);
-      setBillingHistory([]);
-    }
-  }, [selectedGuest]);
+          // Add add-ons as separate entries
+          booking.addOns?.forEach((addon: any, index: number) => {
+            entries.push({
+              id: `addon_${booking._id}_${index}`,
+              description: addon.name,
+              category: 'Additional Services',
+              date: new Date(booking.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+              paymentMethod: 'Room Charge',
+              amount: addon.cost
+            });
+          });
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    const found = guests.find((guest) => {
-      const query = searchQuery.toLowerCase()
-      const info = guest.personalInfo
-      return (
-        info.firstName.toLowerCase().includes(query) ||
-        info.lastName.toLowerCase().includes(query) ||
-        info.email.toLowerCase().includes(query) ||
-        info.phone.includes(query) ||
-        info.idNumber.includes(query)
-      )
-    })
-    setSelectedGuest(found || null)
+          return entries;
+        });
+
+        setBillingHistory(transformedBillingHistory);
+      }
+    } catch (err) {
+      setError("Failed to fetch guest history")
+    }
   }
-  
 
   const renderSearchForm = () => {
     return (
@@ -122,9 +140,43 @@ export function GuestHistoryView() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1"
+              disabled={searchLoading}
+              onFocus={() => searchQuery && setShowSearchResults(true)}
             />
-            <Button type="submit">Search</Button>
+            <Button type="submit" disabled={searchLoading}>
+              {searchLoading ? "Searching..." : "Search"}
+            </Button>
           </form>
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="relative">
+              <div className="absolute left-0 right-0 mt-2 bg-white border rounded shadow-lg z-10 max-h-60 overflow-auto">
+                {searchResults.map((result) => (
+                  <div
+                    key={result.id}
+                    className="p-3 hover:bg-blue-100 cursor-pointer flex items-center justify-between"
+                    onClick={() => handleSelect(result)}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{result.name}</span>
+                      <span className="text-sm text-muted-foreground">{result.email}</span>
+                    </div>
+                    <X 
+                      className="h-4 w-4 text-muted-foreground" 
+                      onClick={e => { 
+                        e.stopPropagation(); 
+                        setShowSearchResults(false); 
+                      }} 
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
     )

@@ -69,7 +69,7 @@ export default function OrderHistory({ restaurantId }: { restaurantId: string })
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/orders`, {
+        const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/orders`, {
           headers: {
             "Authorization": `Bearer ${localStorage.getItem('token')}`
           }

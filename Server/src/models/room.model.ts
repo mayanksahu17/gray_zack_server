@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
 // Define enum for room types
-enum RoomType {
+export enum RoomType {
   STANDARD = 'standard',
   DELUXE = 'deluxe',
   SUITE = 'suite',
@@ -9,7 +9,7 @@ enum RoomType {
 }
 
 // Define enum for room status
-enum RoomStatus {
+export enum RoomStatus {
   AVAILABLE = 'available',
   OCCUPIED = 'occupied',
   MAINTENANCE = 'maintenance',

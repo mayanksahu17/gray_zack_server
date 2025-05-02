@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { execSync } from 'child_process';
-import { app } from './app';
+import  app  from './app';
 import verifyEnvVariables from './utills/checkURI';
 import connectdb from "./db/index";
 

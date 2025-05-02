@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Check, CreditCard, DollarSign, Mail, Phone, Printer, Star, User } from "lucide-react"
+import { Check, CreditCard, DollarSign, Mail, Phone, Printer, Star, User, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -75,735 +75,351 @@ interface CheckoutState {
 
 export function CheckOutView() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [checkoutComplete, setCheckoutComplete] = useState(false)
-  const [checkoutResult, setCheckoutResult] = useState<any>(null)
-  
-  const initialCheckoutState: CheckoutState = {
-    isLoading: false,
-    isSearching: false,
-    error: null,
-    guest: null,
-    booking: null,
-    room: null,
-    roomServices: [],
-    summary: {
-      nightsStayed: 0,
-      roomRate: 0,
-      roomChargeTotal: 0,
-      roomServiceTotal: 0,
-      addOnTotal: 0,
-      subtotal: 0,
-      taxAmount: 0,
-      grandTotal: 0,
-      alreadyPaid: 0,
-      remainingBalance: 0
-    },
-    selectedPaymentMethod: 'credit_card',
-    cardDetails: {
-      number: '',
-      expiry: '',
-      cvv: '',
-      zipCode: ''
-    },
-    housekeepingNotes: '',
-    guestFeedback: '',
-    guestRating: 0
-  }
-  
-  const [state, setState] = useState<CheckoutState>(initialCheckoutState)
-  
-  const updateState = (updates: Partial<CheckoutState>) => {
-    setState(prevState => ({ ...prevState, ...updates }))
-  }
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [selectedGuest, setSelectedGuest] = useState<any>(null)
+  const [checkoutDetails, setCheckoutDetails] = useState<any>(null)
+  const [error, setError] = useState("")
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [recentBookings, setRecentBookings] = useState<any[]>([])
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!searchQuery.trim()) {
-      updateState({ error: "Please enter a search term" })
-      return
-    }
-    
-    updateState({ isSearching: true, error: null })
-    
+  // Search handler
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!searchQuery.trim()) return
+    setSearchLoading(true)
+    setShowSearchResults(true)
+    setError("")
+    setSearchResults([])
+    setSelectedGuest(null)
+    setCheckoutDetails(null)
+    setCheckoutSuccess(false)
     try {
-      // Try to parse the query as different types (email, phone, ID)
-      let searchParams = {}
-      
-      // Check if it might be an email
-      if (searchQuery.includes('@')) {
-        searchParams = { email: searchQuery }
+      const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const data = await res.json()
+      // Flatten and group results for selection
+      const results: any[] = []
+      if (data.guests && data.guests.length > 0) {
+        data.guests.forEach((g: any) => results.push({
+          type: 'Guest',
+          id: g._id,
+          name: `${g.personalInfo?.firstName || g.firstName || ''} ${g.personalInfo?.lastName || g.lastName || ''}`.trim() || g.email || g.phone || g.idNumber,
+          email: g.personalInfo?.email || g.email,
+          phone: g.personalInfo?.phone || g.phone
+        }))
       }
-      // Check if it might be a phone number
-      else if (/^[+\d\s\-()]+$/.test(searchQuery)) {
-        searchParams = { phone: searchQuery }
+      if (data.reservations && data.reservations.length > 0) {
+        data.reservations.forEach((r: any) => results.push({
+          type: 'Reservation',
+          id: r._id,
+          name: `Reservation #${r._id}`,
+          guest: r.guestId,
+          room: r.roomId,
+          status: r.status
+        }))
       }
-      // Otherwise try as ID number
-      else {
-        searchParams = { idNumber: searchQuery }
-      }
-      
-      const results = await guestService.searchGuests(searchParams as any)
-      
-      if (results.length === 0) {
-        updateState({ 
-          isSearching: false,
-          error: "No guests found matching your search criteria" 
-        })
-        return
-      }
-      
-      // If we found a guest, get their checkout details
-      await fetchCheckoutDetails(results[0]._id)
-      
-    } catch (error) {
-      console.error('Search error:', error)
-      updateState({ 
-        isSearching: false, 
-        error: error instanceof Error ? error.message : "Failed to search for guests" 
-      })
+      setSearchResults(results)
+    } catch (err) {
+      setError("Failed to search. Please try again.")
+    } finally {
+      setSearchLoading(false)
     }
   }
 
-  const fetchCheckoutDetails = async (userId: string) => {
-    updateState({ isLoading: true, error: null })
-    
+  // Select guest or reservation
+  const handleSelect = async (result: any) => {
+    setShowSearchResults(false)
+    setSelectedGuest(result)
+    setCheckoutDetails(null)
+    setError("")
+    setCheckoutSuccess(false)
+    setRecentBookings([])
     try {
-      const checkoutDetails = await checkoutService.getCheckoutDetails(userId)
-      
-      updateState({
-        isLoading: false,
-        isSearching: false,
-        guest: checkoutDetails.data.guest,
-        booking: checkoutDetails.data.booking,
-        room: checkoutDetails.data.room,
-        roomServices: checkoutDetails.data.roomServices,
-        summary: checkoutDetails.data.summary
-      })
-      
-    } catch (error) {
-      console.error('Checkout details error:', error)
-      updateState({ 
-        isLoading: false,
-        isSearching: false,
-        error: error instanceof Error ? error.message : "Failed to get checkout details" 
-      })
-    }
-  }
+      let userId = result.type === 'Guest' ? result.id : result.guest?._id || result.guest
+      if (!userId) throw new Error('No guest ID found')
 
-  const handlePaymentMethodChange = (value: string) => {
-    updateState({ 
-      selectedPaymentMethod: value as 'credit_card' | 'cash'
-    })
-  }
-
-  const handleCardDetailsChange = (field: keyof CardDetails, value: string) => {
-    updateState({
-      cardDetails: {
-        ...state.cardDetails,
-        [field]: value
-      }
-    })
-  }
-
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only allow digits and format with spaces every 4 chars
-    const value = e.target.value.replace(/[^0-9]/g, '')
-    const formatted = value.replace(/(.{4})/g, '$1 ').trim()
-    handleCardDetailsChange('number', formatted)
-  }
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Format as MM/YY
-    let value = e.target.value.replace(/[^0-9]/g, '')
-    if (value.length > 2) {
-      value = value.slice(0, 2) + '/' + value.slice(2, 4)
-    }
-    handleCardDetailsChange('expiry', value)
-  }
-
-  const validateCardDetails = (): boolean => {
-    const { cardDetails, selectedPaymentMethod } = state
-    
-    if (selectedPaymentMethod !== 'credit_card') {
-      return true
-    }
-    
-    // Basic validation
-    if (!cardDetails.number || cardDetails.number.replace(/\s/g, '').length < 16) {
-      updateState({ error: 'Please enter a valid card number' })
-      return false
-    }
-    
-    if (!cardDetails.expiry || cardDetails.expiry.length < 5) {
-      updateState({ error: 'Please enter a valid expiry date (MM/YY)' })
-      return false
-    }
-    
-    if (!cardDetails.cvv || cardDetails.cvv.length < 3) {
-      updateState({ error: 'Please enter a valid CVV' })
-      return false
-    }
-    
-    if (!cardDetails.zipCode) {
-      updateState({ error: 'Please enter a valid ZIP code' })
-      return false
-    }
-    
-    return true
-  }
-
-  const handleCheckout = async () => {
-    // Reset any previous errors
-    updateState({ error: null })
-    
-    // Validate card details if credit card is selected
-    if (!validateCardDetails()) {
-      return
-    }
-    
-    updateState({ isLoading: true })
-    
-    try {
-      // Prepare the room service IDs
-      const roomServiceIds = state.roomServices.map(service => service._id)
-      
-      // Format card data for PaidYET
-      const cardData = state.selectedPaymentMethod === 'credit_card' ? {
-        number: state.cardDetails.number.replace(/\s/g, ''),
-        expMonth: state.cardDetails.expiry.split('/')[0].padStart(2, '0'),
-        expYear: state.cardDetails.expiry.includes('/') ? 
-          `20${state.cardDetails.expiry.split('/')[1]}` : 
-          new Date().getFullYear().toString(),
-        cvv: state.cardDetails.cvv,
-        zipCode: state.cardDetails.zipCode
-      } : undefined;
-      
-      // Process the checkout
-      const checkoutData = {
-        userId: state.guest._id,
-        bookingId: state.booking._id,
-        paymentMethod: state.selectedPaymentMethod,
-        roomServices: roomServiceIds,
-        paymentDetails: state.selectedPaymentMethod === 'credit_card' ? { card: cardData } : undefined
-      }
-      
-      const result = await checkoutService.processCheckout(checkoutData)
-      
-      setCheckoutResult(result.data)
-      setCheckoutComplete(true)
-      updateState({ isLoading: false })
-      
-    } catch (error: any) {
-      console.error('Checkout error:', error)
-      
-      let errorMessage = "Failed to process checkout"
-      
-      // Try to extract a more specific error message
-      if (error.message) {
-        if (error.message.includes('401')) {
-          errorMessage = "Payment authorization failed. Please check your card details or try a different payment method."
-        } else if (error.message.includes('400')) {
-          errorMessage = "Invalid payment details. Please check your information and try again."
-        } else if (error.message.includes('500')) {
-          errorMessage = "Server error. Our team has been notified. Please try again later."
-        } else if (error.message.includes('Network Error')) {
-          errorMessage = "Network error. Please check your internet connection and try again."
-        } else {
-          errorMessage = error.message
+      // If selecting a reservation directly, validate its status first
+      if (result.type === 'Reservation') {
+        if (result.status === 'checked_out') {
+          setError('This reservation has already been checked out.')
+          return
         }
       }
-      
-      updateState({ 
-        isLoading: false, 
-        error: errorMessage
-      })
+
+      // Always fetch all bookings for this guest
+      const bookingsRes = await fetch(`http://localhost:8000/api/v1/booking/guest/${userId}`)
+      const bookingsData = await bookingsRes.json()
+      if (Array.isArray(bookingsData)) {
+        // Find checked-in booking
+        const checkedInBooking = bookingsData.find((b: any) => b.status === 'checked_in')
+        if (checkedInBooking) {
+          // Fetch checkout details by booking ID
+          const res = await fetch(`http://localhost:8000/api/v1/checkout/details/booking/${checkedInBooking._id}`)
+          const data = await res.json()
+          if (!data.success) throw new Error(data.error || 'No active reservation found')
+          setCheckoutDetails(data.data)
+          return
+        } else {
+          // Check if there are any checked-out bookings
+          const hasCheckedOutBookings = bookingsData.some((b: any) => b.status === 'checked_out')
+          if (hasCheckedOutBookings) {
+            setRecentBookings(bookingsData.filter((b: any) => b.status === 'checked_out'))
+            setError('This guest has already checked out. Below are their recent bookings.')
+          } else {
+            setRecentBookings(bookingsData)
+            setError('No active (checked-in) booking found for this guest. See recent bookings below.')
+          }
+          return
+        }
+      } else {
+        setError('No active or recent bookings found for this guest.')
+        return
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch checkout details')
     }
   }
 
-  const resetCheckout = () => {
-    setSearchQuery("")
-    setCheckoutComplete(false)
-    setCheckoutResult(null)
-    setState(initialCheckoutState)
+  // Checkout handler
+  const handleCheckout = async () => {
+    if (!checkoutDetails?.guest?._id || !checkoutDetails?.booking?._id) return
+    setCheckoutLoading(true)
+    setError("")
+    try {
+      const res = await fetch('http://localhost:8000/api/v1/checkout/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: checkoutDetails.guest._id,
+          bookingId: checkoutDetails.booking._id,
+          paymentMethod: 'cash', // or 'credit_card' if you want to add payment
+          roomServices: [] // add room service IDs if needed
+        })
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error || 'Checkout failed')
+      setCheckoutSuccess(true)
+    } catch (err: any) {
+      setError(err.message || 'Checkout failed')
+    } finally {
+      setCheckoutLoading(false)
+    }
   }
 
-  const renderSearchForm = () => {
-    return (
+  // UI rendering
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Guest Check-out</h1>
+      {/* Search Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Find Guest</CardTitle>
-          <CardDescription>Search by email, phone number, or ID number</CardDescription>
+          <CardTitle>Find Guest or Reservation</CardTitle>
+          <CardDescription>Search by name, reservation ID, phone, or email</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSearch} className="flex gap-2">
             <Input
-              placeholder="Enter email, phone, or ID number"
+              placeholder="Enter name, reservation ID, phone, or email"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="flex-1"
-              disabled={state.isSearching}
+              disabled={searchLoading}
+              onFocus={() => searchQuery && setShowSearchResults(true)}
             />
-            <Button type="submit" disabled={state.isSearching}>
-              {state.isSearching ? "Searching..." : "Search"}
+            <Button type="submit" disabled={searchLoading}>
+              {searchLoading ? "Searching..." : "Search"}
             </Button>
           </form>
-          
-          {state.error && (
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="relative">
+              <div className="absolute left-0 right-0 mt-2 bg-white border rounded shadow-lg z-10 max-h-60 overflow-auto">
+                {searchResults.map((result, idx) => {
+                  // Skip showing checked out reservations
+                  if (result.type === 'Reservation' && result.status === 'checked_out') {
+                    return null;
+                  }
+                  
+                  return (
+                    <div
+                      key={result.id}
+                      className="p-3 hover:bg-blue-100 cursor-pointer flex items-center justify-between"
+                      onClick={() => handleSelect(result)}
+                    >
+                      <div className="flex flex-col">
+                        <span>{result.type === 'Guest' ? result.name : result.name}</span>
+                        {result.type === 'Reservation' && (
+                          <span className="text-sm text-muted-foreground capitalize">Status: {result.status}</span>
+                        )}
+                      </div>
+                      <X className="h-4 w-4 text-muted-foreground" onClick={e => { e.stopPropagation(); setShowSearchResults(false); }} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {error && (
             <Alert variant="destructive" className="mt-4">
-              <AlertDescription>{state.error}</AlertDescription>
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
         </CardContent>
       </Card>
-    )
-  }
 
-  const renderCheckoutComplete = () => {
-    if (!checkoutResult) return null
-    
-    const { invoice, nightsStayed, totalRevenue, checkoutDate, paymentStatus } = checkoutResult
-    
-    return (
-      <Card className="mx-auto max-w-md text-center">
-        <CardHeader>
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-            <Check className="h-6 w-6 text-green-600" />
-          </div>
-          <CardTitle className="text-xl">Checkout Complete</CardTitle>
-          <CardDescription>The guest has been successfully checked out</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-lg bg-muted p-4 text-left">
-            <div className="mb-2 font-medium">Checkout Summary</div>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Guest:</span>
-                <span>{state.guest?.personalInfo?.firstName} {state.guest?.personalInfo?.lastName}</span>
+      {/* Details & Checkout */}
+      {checkoutDetails && !checkoutSuccess && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reservation & Room Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">{checkoutDetails.guest?.personalInfo?.firstName} {checkoutDetails.guest?.personalInfo?.lastName}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Room:</span>
-                <span>{state.room?.roomNumber}</span>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span>{checkoutDetails.guest?.personalInfo?.email}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Check-in Date:</span>
-                <span>{formatDate(state.booking?.checkIn)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Check-out Date:</span>
-                <span>{formatDate(checkoutDate)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Paid:</span>
-                <span>{formatCurrency(totalRevenue)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Payment Status:</span>
-                <span className="font-medium capitalize">{paymentStatus}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex justify-center gap-2">
-            <Button variant="outline" className="gap-2">
-              <Printer className="h-4 w-4" />
-              <span>Print Receipt</span>
-            </Button>
-            <Button variant="outline" className="gap-2">
-              <Mail className="h-4 w-4" />
-              <span>Email Receipt</span>
-            </Button>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button onClick={resetCheckout}>New Checkout</Button>
-        </CardFooter>
-      </Card>
-    )
-  }
-
-  const renderGuestCheckout = () => {
-    if (!state.guest || !state.booking || !state.room) return null
-    
-    const { guest, booking, room, roomServices, summary } = state
-    
-    // Card details form component
-    const renderCardDetailsForm = () => {
-      if (state.selectedPaymentMethod !== 'credit_card') return null
-      
-      // Check if we're in development mode
-      const isDevelopmentMode = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
-      
-      return (
-        <div className="mt-4 space-y-4 p-4 border rounded-md">
-          <h3 className="font-medium">Enter Card Details</h3>
-          
-          {isDevelopmentMode && (
-            <Alert className="mb-4 bg-blue-50 text-blue-800 border-blue-200">
-              <AlertDescription className="text-xs">
-                Running in development mode. Card payments will be simulated and always succeed.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="space-y-3">
-            <div>
-              <Label htmlFor="card-number">Card Number</Label>
-              <Input 
-                id="card-number" 
-                placeholder="1234 5678 9012 3456" 
-                value={state.cardDetails.number}
-                onChange={handleCardNumberChange}
-                maxLength={19}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="expiry">Expiry (MM/YY)</Label>
-                <Input 
-                  id="expiry" 
-                  placeholder="MM/YY" 
-                  value={state.cardDetails.expiry}
-                  onChange={handleExpiryChange}
-                  maxLength={5}
-                />
-              </div>
-              <div>
-                <Label htmlFor="cvv">CVV</Label>
-                <Input 
-                  id="cvv" 
-                  type="text" 
-                  placeholder="123" 
-                  value={state.cardDetails.cvv}
-                  onChange={(e) => handleCardDetailsChange('cvv', e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-                  maxLength={4}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="zip-code">Billing ZIP Code</Label>
-              <Input 
-                id="zip-code" 
-                placeholder="10001" 
-                value={state.cardDetails.zipCode}
-                onChange={(e) => handleCardDetailsChange('zipCode', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Guest Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{guest.personalInfo.firstName} {guest.personalInfo.lastName}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{guest.personalInfo.email}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{guest.personalInfo.phone}</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span>{checkoutDetails.guest?.personalInfo?.phone}</span>
               </div>
               <Separator className="my-4" />
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Room:</span>
-                  <span className="font-medium">{room.roomNumber}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Check-in:</span>
-                  <span className="font-medium">{formatDate(booking.checkIn)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Expected Check-out:</span>
-                  <span className="font-medium">{formatDate(booking.expectedCheckOut)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Length of Stay:</span>
-                  <span className="font-medium">{summary.nightsStayed} Nights</span>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Room:</span>
+                <span className="font-medium">{checkoutDetails.room?.roomNumber}</span>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Room Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span>Minibar Consumption</span>
-                  <span className="font-medium text-amber-600">Needs Verification</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Room Condition</span>
-                  <span className="font-medium text-green-600">Verified</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Lost Items</span>
-                  <span className="font-medium text-green-600">None Reported</span>
-                </div>
-                <Separator />
-                <div>
-                  <Label htmlFor="roomNotes">Notes for Housekeeping</Label>
-                  <Textarea 
-                    id="roomNotes" 
-                    placeholder="Add any notes for housekeeping..." 
-                    value={state.housekeepingNotes}
-                    onChange={(e) => updateState({ housekeepingNotes: e.target.value })}
-                  />
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Check-in:</span>
+                <span className="font-medium">{new Date(checkoutDetails.booking?.checkIn).toLocaleDateString()}</span>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Guest Feedback</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <Label className="mb-2 block">Overall Experience</Label>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((rating) => (
-                      <Button 
-                        key={rating} 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-8 w-8 rounded-full"
-                        onClick={() => updateState({ guestRating: rating })}
-                      >
-                        <Star className={`h-4 w-4 ${rating <= state.guestRating ? "fill-primary text-primary" : ""}`} />
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="feedback">Additional Comments</Label>
-                  <Textarea 
-                    id="feedback" 
-                    placeholder="Enter guest feedback..." 
-                    value={state.guestFeedback}
-                    onChange={(e) => updateState({ guestFeedback: e.target.value })}
-                  />
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Expected Check-out:</span>
+                <span className="font-medium">{new Date(checkoutDetails.booking?.expectedCheckOut).toLocaleDateString()}</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Billing Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="itemized">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="itemized">Itemized</TabsTrigger>
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                </TabsList>
-                <TabsContent value="itemized" className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between font-medium">
-                      <span>Room Charges</span>
-                      <span></span>
-                    </div>
-                    <div className="ml-4 space-y-1 text-sm">
-                      {Array.from({ length: summary.nightsStayed }).map((_, index) => {
-                        const date = new Date(booking.checkIn);
-                        date.setDate(date.getDate() + index);
-                        return (
-                          <div key={index} className="flex items-center justify-between">
-                            <span>{room.type} - {formatDate(date)}</span>
-                            <span>{formatCurrency(summary.roomRate)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {roomServices.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between font-medium">
-                        <span>Room Services</span>
-                        <span></span>
-                      </div>
-                      <div className="ml-4 space-y-1 text-sm">
-                        {roomServices.map((service, index) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <span>Room Service - {formatDate(service.createdAt)}</span>
-                            <span>{formatCurrency(service.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {booking.addOns && booking.addOns.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between font-medium">
-                        <span>Add-On Services</span>
-                        <span></span>
-                      </div>
-                      <div className="ml-4 space-y-1 text-sm">
-                        {booking.addOns.map((addon: AddOn, index: number) => (
-                          <div key={index} className="flex items-center justify-between">
-                            <span>{addon.name}</span>
-                            <span>{formatCurrency(addon.cost)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span>Subtotal</span>
-                      <span>{formatCurrency(summary.subtotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Taxes (10%)</span>
-                      <span>{formatCurrency(summary.taxAmount)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Prepaid Amount</span>
-                      <span className="text-red-500">-{formatCurrency(summary.alreadyPaid)}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between font-bold">
-                      <span>Balance Due</span>
-                      <span>{formatCurrency(summary.remainingBalance)}</span>
-                    </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="summary" className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span>Room Charges</span>
-                      <span>{formatCurrency(summary.roomChargeTotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Room Services</span>
-                      <span>{formatCurrency(summary.roomServiceTotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Add-On Services</span>
-                      <span>{formatCurrency(summary.addOnTotal)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Taxes</span>
-                      <span>{formatCurrency(summary.taxAmount)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Prepaid Amount</span>
-                      <span className="text-red-500">-{formatCurrency(summary.alreadyPaid)}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between font-bold">
-                      <span>Balance Due</span>
-                      <span>{formatCurrency(summary.remainingBalance)}</span>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup 
-                value={state.selectedPaymentMethod} 
-                onValueChange={handlePaymentMethodChange}
-                className="space-y-3"
-              >
-                <div className="flex items-center space-x-2 rounded-md border p-3">
-                  <RadioGroupItem value="credit_card" id="checkout-credit-card" />
-                  <Label htmlFor="checkout-credit-card" className="flex flex-1 items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    <span>Credit/Debit Card</span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 rounded-md border p-3">
-                  <RadioGroupItem value="cash" id="checkout-cash" />
-                  <Label htmlFor="checkout-cash" className="flex flex-1 items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    <span>Cash</span>
-                  </Label>
-                </div>
-              </RadioGroup>
-
-              {state.selectedPaymentMethod === 'credit_card' && renderCardDetailsForm()}
-              
-              {state.error && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertDescription>{state.error}</AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end gap-2">
-            <Button 
-              variant="outline" 
-              onClick={resetCheckout}
-              disabled={state.isLoading}
-            >
-              Cancel
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Reservation Status:</span>
+                <span className="font-medium capitalize">{checkoutDetails.booking?.status}</span>
+              </div>
+              <Separator className="my-4" />
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Total Due:</span>
+                <span className="font-bold">${checkoutDetails.summary?.remainingBalance?.toFixed(2)}</span>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Button onClick={handleCheckout} disabled={checkoutLoading}>
+              {checkoutLoading ? "Processing..." : "Checkout"}
             </Button>
-            <Button 
-              onClick={handleCheckout}
-              disabled={state.isLoading}
-            >
-              {state.isLoading ? (
-                <span className="flex items-center gap-2">
-                  <Spinner size="sm" />
-                  Processing Payment...
-                </span>
-              ) : (
-                "Complete Checkout"
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Guest Check-out</h1>
-
-      {state.isLoading && !checkoutComplete && (
-        <div className="flex justify-center items-center p-8">
-          <div className="text-center">
-            <div className="mb-4">Loading checkout information...</div>
-            <Spinner size="lg" className="mx-auto text-primary" />
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       )}
 
-      {!state.guest && !checkoutComplete && !state.isLoading && renderSearchForm()}
-      {state.guest && !checkoutComplete && !state.isLoading && renderGuestCheckout()}
-      {checkoutComplete && renderCheckoutComplete()}
+      {/* Recent Bookings if no active booking */}
+      {recentBookings.length > 0 && !checkoutDetails && !checkoutSuccess && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Bookings</CardTitle>
+            <CardDescription>No active (checked-in) booking found. Select a booking below to view details.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {recentBookings.map((booking: any) => (
+                <div key={booking._id} className="border rounded p-3 flex flex-col gap-1 mb-2">
+                  <div className="flex justify-between">
+                    <span>Reservation ID:</span>
+                    <span>{booking._id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Status:</span>
+                    <span className="capitalize">{booking.status}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Room:</span>
+                    <span>{booking.roomId?.roomNumber || booking.roomId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Check-in:</span>
+                    <span>{new Date(booking.checkIn).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Check-out:</span>
+                    <span>{new Date(booking.expectedCheckOut).toLocaleDateString()}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="mt-2"
+                    disabled={booking.status !== 'checked_in'}
+                    onClick={async () => {
+                      // Try to fetch checkout details for this booking
+                      try {
+                        const res = await fetch(`http://localhost:8000/api/v1/checkout/details/booking/${booking._id}`)
+                        const data = await res.json()
+                        if (!data.success) throw new Error(data.error || 'No active reservation found')
+                        setCheckoutDetails(data.data)
+                        setError("")
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to fetch checkout details')
+                      }
+                    }}
+                  >
+                    {booking.status === 'checked_in' ? 'Proceed to Checkout' : 'Not Checked In'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Success Message */}
+      {checkoutSuccess && (
+        <Card className="mx-auto max-w-md text-center">
+          <CardHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+              <Check className="h-6 w-6 text-green-600" />
+            </div>
+            <CardTitle className="text-xl">Checkout Complete</CardTitle>
+            <CardDescription>The guest has been successfully checked out</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg bg-muted p-4 text-left">
+              <div className="mb-2 font-medium">Checkout Summary</div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Guest:</span>
+                  <span>{checkoutDetails.guest?.personalInfo?.firstName} {checkoutDetails.guest?.personalInfo?.lastName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Room:</span>
+                  <span>{checkoutDetails.room?.roomNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Check-in Date:</span>
+                  <span>{new Date(checkoutDetails.booking?.checkIn).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Check-out Date:</span>
+                  <span>{new Date().toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Paid:</span>
+                  <span>${checkoutDetails.summary?.grandTotal?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment Status:</span>
+                  <span className="font-medium capitalize">Paid</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
