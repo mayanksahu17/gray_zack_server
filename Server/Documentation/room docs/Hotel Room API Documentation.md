@@ -1,6 +1,6 @@
 # Hotel Room API Documentation
 
-Base URL: `http://localhost:8000/api/v1/room`
+Base URL: `http://16.171.47.60:8000/api/v1/room`
 
 ## Table of Contents
 - [Authentication](#authentication)

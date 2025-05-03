@@ -79,7 +79,7 @@ else if (AuthUtils.hasRole('front_desk')) {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/staff/hotel/login', {
+      const response = await fetch('http://16.171.47.60:8000/api/v1/staff/hotel/login', {
         method: 'POST',
         credentials: 'include', // Important for handling cookies
         headers: {
