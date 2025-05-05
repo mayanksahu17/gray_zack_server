@@ -6,7 +6,7 @@ import { Bell, Calendar, CheckSquare, CreditCard, Home, LogOut, Search, Settings
 import { CheckInView } from "@/components/check-in-view"
 import { CheckOutView } from "@/components/check-out-view"
 import { GuestHistoryView } from "@/components/guest-history-view"
-import { ReportingView } from "@/components/reporting-view"
+import  ReportingView  from "@/components/reporting-view"
 import { RoomManagementView } from "@/components/room-management-view"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

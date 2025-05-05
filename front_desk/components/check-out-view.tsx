@@ -99,26 +99,36 @@ export function CheckOutView() {
     try {
       const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
       const data = await res.json()
+      
       // Flatten and group results for selection
       const results: any[] = []
       if (data.guests && data.guests.length > 0) {
-        data.guests.forEach((g: any) => results.push({
-          type: 'Guest',
-          id: g._id,
-          name: `${g.personalInfo?.firstName || g.firstName || ''} ${g.personalInfo?.lastName || g.lastName || ''}`.trim() || g.email || g.phone || g.idNumber,
-          email: g.personalInfo?.email || g.email,
-          phone: g.personalInfo?.phone || g.phone
-        }))
+        results.push({
+          group: 'Guests',
+          items: data.guests.map((g: any) => ({
+            type: 'Guest',
+            id: g._id,
+            name: `${g.personalInfo?.firstName || g.firstName || ''} ${g.personalInfo?.lastName || g.lastName || ''}`.trim(),
+            email: g.personalInfo?.email || g.email,
+            phone: g.personalInfo?.phone || g.phone,
+            guest: g
+          }))
+        })
       }
       if (data.reservations && data.reservations.length > 0) {
-        data.reservations.forEach((r: any) => results.push({
-          type: 'Reservation',
-          id: r._id,
-          name: `Reservation #${r._id}`,
-          guest: r.guestId,
-          room: r.roomId,
-          status: r.status
-        }))
+        results.push({
+          group: 'Reservations',
+          items: data.reservations.map((r: any) => ({
+            type: 'Reservation',
+            id: r._id,
+            name: `Reservation #${r._id}`,
+            guest: r.guestId,
+            room: r.roomId,
+            status: r.status,
+            checkIn: new Date(r.checkIn).toLocaleDateString(),
+            checkOut: new Date(r.expectedCheckOut).toLocaleDateString()
+          }))
+        })
       }
       setSearchResults(results)
     } catch (err) {
@@ -232,31 +242,52 @@ export function CheckOutView() {
               {searchLoading ? "Searching..." : "Search"}
             </Button>
           </form>
-          {showSearchResults && searchResults.length > 0 && (
+          {showSearchResults && (
             <div className="relative">
               <div className="absolute left-0 right-0 mt-2 bg-white border rounded shadow-lg z-10 max-h-60 overflow-auto">
-                {searchResults.map((result, idx) => {
-                  // Skip showing checked out reservations
-                  if (result.type === 'Reservation' && result.status === 'checked_out') {
-                    return null;
-                  }
-                  
-                  return (
-                    <div
-                      key={result.id}
-                      className="p-3 hover:bg-blue-100 cursor-pointer flex items-center justify-between"
-                      onClick={() => handleSelect(result)}
-                    >
-                      <div className="flex flex-col">
-                        <span>{result.type === 'Guest' ? result.name : result.name}</span>
-                        {result.type === 'Reservation' && (
-                          <span className="text-sm text-muted-foreground capitalize">Status: {result.status}</span>
-                        )}
+                {searchResults.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    {searchLoading ? "Searching..." : "No results found"}
+                  </div>
+                ) : (
+                  searchResults.map((group, gIdx) => (
+                    <div key={gIdx}>
+                      <div className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground uppercase">
+                        {group.group}
                       </div>
-                      <X className="h-4 w-4 text-muted-foreground" onClick={e => { e.stopPropagation(); setShowSearchResults(false); }} />
+                      {group.items.map((result: any) => (
+                        <div
+                          key={result.id}
+                          className="p-3 hover:bg-blue-100 cursor-pointer flex items-center justify-between"
+                          onClick={() => handleSelect(result)}
+                        >
+                          <div className="flex flex-col">
+                            {result.type === 'Guest' ? (
+                              <>
+                                <span className="font-medium">{result.name}</span>
+                                <span className="text-sm text-muted-foreground">{result.email}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-medium">{result.name}</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {result.checkIn} - {result.checkOut}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <X 
+                            className="h-4 w-4 text-muted-foreground" 
+                            onClick={e => { 
+                              e.stopPropagation(); 
+                              setShowSearchResults(false); 
+                            }} 
+                          />
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  ))
+                )}
               </div>
             </div>
           )}

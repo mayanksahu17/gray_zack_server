@@ -1,7 +1,12 @@
-import { Router } from 'express';
-import { getCheckoutDetails, processCheckout, getCheckoutHistory } from '../controller/checkout.controller';
+import express from 'express';
+import { 
+  getCheckoutDetails, 
+  processCheckout, 
+  getCheckoutHistory,
+  getCheckoutDetailsByBooking 
+} from '../controller/checkout.controller';
 
-const router = Router();
+const router = express.Router();
 
 // Get checkout details for a guest
 router.get('/guest/:userId', getCheckoutDetails);
@@ -12,4 +17,7 @@ router.post('/process', processCheckout);
 // Get checkout history for a guest
 router.get('/history/:userId', getCheckoutHistory);
 
-export default router; 
+// Get checkout details by booking ID
+router.get('/details/booking/:bookingId', getCheckoutDetailsByBooking);
+
+export default router;

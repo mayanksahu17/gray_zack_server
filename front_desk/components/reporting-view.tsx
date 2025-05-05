@@ -1,1020 +1,738 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Download, Filter, Printer, RefreshCw } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react"
+import reportsApi from "@/api/reports"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer } from "@/components/ui/chart"
-import { DatePickerWithRange } from "@/components/ui/date-picker-with-range"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DateRange as DayPickerDateRange } from "react-day-picker"
-import { 
-  getDashboardSummary, 
-  getOccupancyByRoomType,
-  getRevenueByRoomType,
-  getDailyOccupancyAndRevenue,
-  getBookingSources,
-  type DashboardSummary,
-  type RoomTypeOccupancy,
-  type RoomTypeRevenue,
-  type DailyMetrics,
-  type DateRange as ApiDateRange
-} from "../api/analytics"
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  Cell,
+} from "recharts"
+import { format, subDays } from "date-fns"
+import { CalendarIcon, Loader2, RefreshCw } from 'lucide-react'
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-export function ReportingView() {
-  // Current hotel ID - in a real app, this would come from context or URL params
-  const hotelId = "65f3c3dddad15237f36f22d9" // Example hotel ID
-  
-  // Date range state
-  const [dateRange, setDateRange] = useState<DayPickerDateRange>({
-    from: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // Last 10 days
-    to: new Date()
-  })
+// Types
+interface DateRange {
+  from?: Date
+  to?: Date
+}
 
-  // Report type state
-  const [reportType, setReportType] = useState("occupancy")
-  
-  // Loading states
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  
-  // Data states
-  const [summaryData, setSummaryData] = useState<DashboardSummary | null>(null)
-  const [occupancyByRoomType, setOccupancyByRoomType] = useState<RoomTypeOccupancy[]>([])
-  const [revenueByRoomType, setRevenueByRoomType] = useState<RoomTypeRevenue[]>([])
-  const [dailyMetrics, setDailyMetrics] = useState<DailyMetrics[]>([])
-  
-  // Convert to API date range format
-  const getApiDateRange = (): ApiDateRange | undefined => {
-    if (!dateRange.from || !dateRange.to) return undefined;
-    return {
-      from: dateRange.from,
-      to: dateRange.to
-    };
-  };
-  
-  // Fetch dashboard data when component mounts or date range changes
+interface MetricCardProps {
+  title: string
+  value: string | number
+  description?: string
+  isLoading?: boolean
+  icon?: React.ReactNode
+}
+
+// Colors for charts
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d"]
+
+// MetricCard Component
+const MetricCard = ({ title, value, description, isLoading = false, icon }: MetricCardProps) => {
+  return (
+    <Card className="bg-white">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
+        {icon && <div className="text-blue-500">{icon}</div>}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+        ) : (
+          <>
+            <div className="text-2xl font-bold text-blue-600">{value}</div>
+            {description && <p className="text-xs text-gray-500">{description}</p>}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Enhanced DateRangePicker Component with presets
+const DateRangePicker = ({
+  dateRange,
+  setDateRange,
+}: {
+  dateRange: DateRange
+  setDateRange: (range: DateRange) => void
+}) => {
+  // Client-side only state to prevent hydration mismatch
+  const [mounted, setMounted] = useState(false)
+
+  // Only show the component after first render to avoid hydration mismatch
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!dateRange.from || !dateRange.to) return
+    setMounted(true)
+  }, [])
+
+  const handlePresetChange = (value: string) => {
+    const today = new Date()
+    
+    switch (value) {
+      case "7days":
+        setDateRange({
+          from: subDays(today, 7),
+          to: today,
+        })
+        break
+      case "30days":
+        setDateRange({
+          from: subDays(today, 30),
+          to: today,
+        })
+        break
+      case "90days":
+        setDateRange({
+          from: subDays(today, 90),
+          to: today,
+        })
+        break
+      case "thisMonth":
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+        setDateRange({
+          from: firstDayOfMonth,
+          to: today,
+        })
+        break
+      case "lastMonth":
+        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
+        setDateRange({
+          from: firstDayLastMonth,
+          to: lastDayLastMonth,
+        })
+        break
+      case "clear":
+        setDateRange({})
+        break
+    }
+  }
+
+  if (!mounted) {
+    return <div className="w-[300px] h-10 bg-gray-100 animate-pulse rounded-md"></div>
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-2">
+      <Select onValueChange={handlePresetChange}>
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Select range" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="7days">Last 7 days</SelectItem>
+          <SelectItem value="30days">Last 30 days</SelectItem>
+          <SelectItem value="90days">Last 90 days</SelectItem>
+          <SelectItem value="thisMonth">This month</SelectItem>
+          <SelectItem value="lastMonth">Last month</SelectItem>
+          <SelectItem value="clear">Clear selection</SelectItem>
+        </SelectContent>
+      </Select>
       
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="date"
+            variant={"outline"}
+            className={cn("w-[300px] justify-start text-left font-normal", !dateRange.from && "text-muted-foreground")}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {dateRange.from ? (
+              dateRange.to ? (
+                <>
+                  {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
+                </>
+              ) : (
+                format(dateRange.from, "LLL dd, y")
+              )
+            ) : (
+              <span>Pick a date range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0">
+          <Calendar
+            initialFocus
+            mode="range"
+            defaultMonth={dateRange.from}
+            selected={{
+              from: dateRange.from,
+              to: dateRange.to,
+            }}
+            onSelect={setDateRange}
+            numberOfMonths={2}
+            required
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
+
+// Main ReportingView Component
+export default function ReportingView() {
+  // Client-side only state to prevent hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  const [activeTab, setActiveTab] = useState("dashboard")
+  const [dateRange, setDateRange] = useState<DateRange>({})
+  const [hotelId, setHotelId] = useState("646e2d72f3ad498c0a0b0b66") // Example hotel ID, should come from user context or route
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Data states
+  const [dashboardData, setDashboardData] = useState<any>(null)
+  const [occupancyData, setOccupancyData] = useState<any>(null)
+  const [revenueData, setRevenueData] = useState<any>(null)
+  const [guestData, setGuestData] = useState<any>(null)
+
+  // Only show the component after first render to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Fetch data based on active tab
+  useEffect(() => {
+    if (!mounted) return
+
+    const fetchData = async () => {
       setIsLoading(true)
-      setError(null)
-      
       try {
-        // Fetch all required data
-        const apiDateRange = getApiDateRange();
-        const [summary, occupancyData, revenueData, dailyData] = await Promise.all([
-          getDashboardSummary(hotelId, apiDateRange).catch(() => getFallbackSummary()),
-          getOccupancyByRoomType(hotelId).catch(() => getFallbackOccupancy()),
-          getRevenueByRoomType(hotelId, apiDateRange).catch(() => getFallbackRevenue()),
-          getDailyOccupancyAndRevenue(hotelId, apiDateRange).catch(() => getFallbackDailyMetrics())
-        ])
-        
-        setSummaryData(summary)
-        setOccupancyByRoomType(occupancyData)
-        setRevenueByRoomType(revenueData)
-        setDailyMetrics(dailyData)
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err)
-        setError("Failed to load analytics data. Using fallback data for demonstration purposes.")
-        
-        // Set fallback data
-        setSummaryData(getFallbackSummary())
-        setOccupancyByRoomType(getFallbackOccupancy())
-        setRevenueByRoomType(getFallbackRevenue())
-        setDailyMetrics(getFallbackDailyMetrics())
+        const params = {
+          hotelId,
+          startDate: dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+          endDate: dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+        }
+
+        switch (activeTab) {
+          case "dashboard":
+            const dashboardResponse = await reportsApi.getDashboardMetrics(
+              params.hotelId,
+              params.startDate,
+              params.endDate,
+            )
+            setDashboardData(dashboardResponse.data)
+            break
+          case "occupancy":
+            const occupancyResponse = await reportsApi.getOccupancyMetrics(
+              params.hotelId,
+              params.startDate,
+              params.endDate,
+            )
+            setOccupancyData(occupancyResponse.data)
+            break
+          case "revenue":
+            const revenueResponse = await reportsApi.getRevenueMetrics(params.hotelId, params.startDate, params.endDate)
+            setRevenueData(revenueResponse.data)
+            break
+          case "guests":
+            const guestResponse = await reportsApi.getGuestMetrics(params.hotelId, params.startDate, params.endDate)
+            setGuestData(guestResponse.data)
+            break
+        }
+      } catch (error) {
+        console.error(`Error fetching ${activeTab} data:`, error)
       } finally {
         setIsLoading(false)
       }
     }
-    
-    fetchDashboardData()
-  }, [hotelId, dateRange])
-  
-  // Function to refresh data
-  const handleRefresh = async () => {
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      // Fetch all required data
-      const apiDateRange = getApiDateRange();
-      const [summary, occupancyData, revenueData, dailyData] = await Promise.all([
-        getDashboardSummary(hotelId, apiDateRange).catch(() => getFallbackSummary()),
-        getOccupancyByRoomType(hotelId).catch(() => getFallbackOccupancy()),
-        getRevenueByRoomType(hotelId, apiDateRange).catch(() => getFallbackRevenue()),
-        getDailyOccupancyAndRevenue(hotelId, apiDateRange).catch(() => getFallbackDailyMetrics())
-      ])
-      
-      setSummaryData(summary)
-      setOccupancyByRoomType(occupancyData)
-      setRevenueByRoomType(revenueData)
-      setDailyMetrics(dailyData)
-    } catch (err) {
-      console.error("Error refreshing dashboard data:", err)
-      setError("Failed to refresh analytics data. Using fallback data for demonstration purposes.")
-      
-      // Set fallback data
-      setSummaryData(getFallbackSummary())
-      setOccupancyByRoomType(getFallbackOccupancy())
-      setRevenueByRoomType(getFallbackRevenue())
-      setDailyMetrics(getFallbackDailyMetrics())
-    } finally {
-      setIsLoading(false)
-    }
-  }
-  
-  // Fallback data functions for demonstration
-  const getFallbackSummary = (): DashboardSummary => ({
-    occupancyRate: 76.4,
-    totalRooms: 100,
-    occupiedRooms: 76,
-    adr: 189.5,
-    revpar: 144.78,
-    totalRevenue: 42856,
-    todayRevenue: 4320
-  })
-  
-  const getFallbackOccupancy = (): RoomTypeOccupancy[] => [
-    { roomType: 'standard', totalRooms: 50, occupiedRooms: 42, occupancyRate: 84 },
-    { roomType: 'deluxe', totalRooms: 30, occupiedRooms: 22, occupancyRate: 73.3 },
-    { roomType: 'suite', totalRooms: 15, occupiedRooms: 10, occupancyRate: 66.7 },
-    { roomType: 'Accessible', totalRooms: 5, occupiedRooms: 2, occupancyRate: 40 }
-  ]
-  
-  const getFallbackRevenue = (): RoomTypeRevenue[] => [
-    { roomType: 'standard', roomRevenue: 15000, fbRevenue: 5500, otherRevenue: 2200, totalRevenue: 22700, count: 42 },
-    { roomType: 'deluxe', roomRevenue: 12500, fbRevenue: 4200, otherRevenue: 1800, totalRevenue: 18500, count: 22 },
-    { roomType: 'suite', roomRevenue: 9500, fbRevenue: 3500, otherRevenue: 1500, totalRevenue: 14500, count: 10 },
-    { roomType: 'Accessible', roomRevenue: 1500, fbRevenue: 800, otherRevenue: 400, totalRevenue: 2700, count: 2 }
-  ]
-  
-  const getFallbackDailyMetrics = (): DailyMetrics[] => {
-    const today = new Date()
-    return Array.from({ length: 10 }).map((_, i) => {
-      const date = new Date(today)
-      date.setDate(date.getDate() - (9 - i))
-      return {
-        date: date.toISOString().split('T')[0],
-        occupancyRate: 65 + Math.floor(Math.random() * 20),
-        adr: 180 + Math.floor(Math.random() * 20),
-        revenue: 4500 + Math.floor(Math.random() * 1500)
-      }
-    })
-  }
-  
-  // Handler for report generation
-  const handleGenerateReport = () => {
-    // This would trigger a more detailed report based on the selected type
-    console.log(`Generating ${reportType} report for date range:`, dateRange)
-  }
 
-  // Format date for display
-  const formatDateRange = () => {
-    if (!dateRange.from || !dateRange.to) return ""
-    
-    const fromDate = dateRange.from.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    })
-    
-    const toDate = dateRange.to.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    })
-    
-    return `${fromDate} - ${toDate}`
-  }
-  
-  // Helper to format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2
-    }).format(amount)
-  }
-  
-  // Helper to format percentage
-  const formatPercentage = (value: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "percent",
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1
-    }).format(value / 100)
+    fetchData()
+  }, [activeTab, dateRange, hotelId, mounted])
+
+  // Prevent hydration errors by not rendering anything on the server
+  if (!mounted) {
+    return (
+      <div className="container mx-auto p-4 bg-gray-50 min-h-screen">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-12 bg-gray-200 rounded"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Reports & Analytics</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
-            <Printer className="h-4 w-4" />
-            <span>Print</span>
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
-        </div>
+    <div className="container mx-auto p-4 bg-gray-50 min-h-screen">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-blue-700">Reports & Analytics</h1>
+        <p className="text-gray-500 mt-1">View and analyze your hotel performance metrics</p>
       </div>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-end">
-        <div className="flex-1 space-y-2">
-          <Label>Date Range</Label>
-          <DatePickerWithRange 
-            className="w-full max-w-sm" 
-            date={dateRange}
-            onSelect={(range) => range && setDateRange(range)}
-          />
-        </div>
-        <div className="flex gap-2">
-          <div>
-            <Label htmlFor="report-type" className="sr-only">
-              Report Type
-            </Label>
-            <Select 
-              value={reportType} 
-              onValueChange={setReportType}
-            >
-              <SelectTrigger id="report-type" className="w-[180px]">
-                <SelectValue placeholder="Report Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="occupancy">Occupancy</SelectItem>
-                <SelectItem value="revenue">Revenue</SelectItem>
-                <SelectItem value="adr">ADR</SelectItem>
-                <SelectItem value="revpar">RevPAR</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={handleRefresh}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
-          </Button>
-          <Button onClick={handleGenerateReport}>Generate Report</Button>
-        </div>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <DateRangePicker dateRange={dateRange} setDateRange={setDateRange} />
+        <Button
+          onClick={() => {
+            const currentTab = activeTab
+            setActiveTab("dashboard")
+            setTimeout(() => setActiveTab(currentTab), 10)
+          }}
+          variant="outline"
+          className="border-blue-500 text-blue-500 hover:bg-blue-50"
+        >
+          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+        </Button>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-red-50 p-4 text-sm text-red-500">
-          {error}
-        </div>
-      )}
-
-      <Tabs defaultValue="dashboard">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="occupancy">Occupancy</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="guests">Guests</TabsTrigger>
+      <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-blue-50 border border-blue-100">
+          <TabsTrigger value="dashboard" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="occupancy" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            Occupancy
+          </TabsTrigger>
+          <TabsTrigger value="revenue" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            Revenue
+          </TabsTrigger>
+          <TabsTrigger value="guests" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            Guests
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="dashboard" className="mt-4 space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Occupancy Rate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? 'Loading...' : (
-                    summaryData ? formatPercentage(summaryData.occupancyRate) : '0%'
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {summaryData?.occupiedRooms || 0} of {summaryData?.totalRooms || 0} rooms occupied
-                </p>
-                <div className="mt-4 h-[80px]">
-                  <ChartContainer
-                    className="h-full w-full"
-                    config={{
-                      grid: {
-                        x: {
-                          show: false,
-                        },
-                        y: {
-                          show: false,
-                        },
-                      },
-                      xAxis: {
-                        type: "category",
-                        show: false,
-                      },
-                      yAxis: {
-                        show: false,
-                        min: 0,
-                        max: 100,
-                      },
-                      tooltip: {
-                        show: false,
-                      },
-                    }}
-                    series={[
-                      {
-                        type: "line",
-                        data: dailyMetrics.map(day => day.occupancyRate),
-                        smooth: true,
-                        lineStyle: {
-                          color: "hsl(var(--primary))",
-                          width: 2,
-                        },
-                        itemStyle: {
-                          color: "hsl(var(--primary))",
-                        },
-                      },
-                    ]}
-                  >
-                    <div className="h-full w-full" />
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Average Daily Rate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? 'Loading...' : (
-                    summaryData ? formatCurrency(summaryData.adr) : '$0.00'
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Per occupied room
-                </p>
-                <div className="mt-4 h-[80px]">
-                  <ChartContainer
-                    className="h-full w-full"
-                    config={{
-                      grid: {
-                        x: {
-                          show: false,
-                        },
-                        y: {
-                          show: false,
-                        },
-                      },
-                      xAxis: {
-                        type: "category",
-                        show: false,
-                      },
-                      yAxis: {
-                        show: false,
-                      },
-                      tooltip: {
-                        show: false,
-                      },
-                    }}
-                    series={[
-                      {
-                        type: "line",
-                        data: dailyMetrics.map(day => day.adr),
-                        smooth: true,
-                        lineStyle: {
-                          color: "hsl(var(--primary))",
-                          width: 2,
-                        },
-                        itemStyle: {
-                          color: "hsl(var(--primary))",
-                        },
-                      },
-                    ]}
-                  >
-                    <div className="h-full w-full" />
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">RevPAR</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? 'Loading...' : (
-                    summaryData ? formatCurrency(summaryData.revpar) : '$0.00'
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Revenue Per Available Room
-                </p>
-                <div className="mt-4 h-[80px]">
-                  <ChartContainer
-                    className="h-full w-full"
-                    config={{
-                      grid: {
-                        x: {
-                          show: false,
-                        },
-                        y: {
-                          show: false,
-                        },
-                      },
-                      xAxis: {
-                        type: "category",
-                        show: false,
-                      },
-                      yAxis: {
-                        show: false,
-                      },
-                      tooltip: {
-                        show: false,
-                      },
-                    }}
-                    series={[
-                      {
-                        type: "line",
-                        data: dailyMetrics.map(day => 
-                          (day.revenue / (summaryData?.totalRooms || 1))
-                        ),
-                        smooth: true,
-                        lineStyle: {
-                          color: "hsl(var(--primary))",
-                          width: 2,
-                        },
-                        itemStyle: {
-                          color: "hsl(var(--primary))",
-                        },
-                      },
-                    ]}
-                  >
-                    <div className="h-full w-full" />
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {isLoading ? 'Loading...' : (
-                    summaryData ? formatCurrency(summaryData.totalRevenue) : '$0.00'
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {summaryData?.todayRevenue ? `+${formatCurrency(summaryData.todayRevenue)} today` : 'No revenue today'}
-                </p>
-                <div className="mt-4 h-[80px]">
-                  <ChartContainer
-                    className="h-full w-full"
-                    config={{
-                      grid: {
-                        x: {
-                          show: false,
-                        },
-                        y: {
-                          show: false,
-                        },
-                      },
-                      xAxis: {
-                        type: "category",
-                        show: false,
-                      },
-                      yAxis: {
-                        show: false,
-                      },
-                      tooltip: {
-                        show: false,
-                      },
-                    }}
-                    series={[
-                      {
-                        type: "line",
-                        data: dailyMetrics.map(day => day.revenue),
-                        smooth: true,
-                        lineStyle: {
-                          color: "hsl(var(--primary))",
-                          width: 2,
-                        },
-                        itemStyle: {
-                          color: "hsl(var(--primary))",
-                        },
-                      },
-                    ]}
-                  >
-                    <div className="h-full w-full" />
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
+
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MetricCard
+              title="Total Revenue"
+              value={dashboardData ? `$${dashboardData.totalRevenue.toFixed(2)}` : "$0.00"}
+              isLoading={isLoading}
+            />
+            <MetricCard title="Active Bookings" value={dashboardData?.activeBookings || 0} isLoading={isLoading} />
+            <MetricCard
+              title="Room Service Orders"
+              value={dashboardData?.roomServiceOrders || 0}
+              isLoading={isLoading}
+            />
+            <MetricCard title="Total Guests" value={dashboardData?.totalGuests || 0} isLoading={isLoading} />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="col-span-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+            <Card className="bg-white">
               <CardHeader>
-                <CardTitle>Occupancy by Room Type</CardTitle>
-                <CardDescription>{formatDateRange()}</CardDescription>
+                <CardTitle>Occupancy Overview</CardTitle>
+                <CardDescription>Current occupancy rate and trends</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  {isLoading ? (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-muted-foreground">Loading chart data...</p>
-                    </div>
-                  ) : occupancyByRoomType.length > 0 ? (
-                  <ChartContainer
-                    className="h-full w-full"
-                    config={{
-                      tooltip: {
-                        trigger: "item",
-                          formatter: "{b}: {c} rooms ({d}%)"
-                      },
-                      legend: {
-                        orient: "vertical",
-                        right: 10,
-                        top: "center",
-                          formatter: "{name}"
-                        },
-                      }}
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={
+                        occupancyData?.dailyOccupancy?.map((item: any) => ({
+                          date: item._id,
+                          value: item.count,
+                        })) || []
+                      }
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      {/* Chart requires children */}
-                      <div className="h-full">
-                        {/* Pie chart data would be processed here */}
-                        {JSON.stringify(occupancyByRoomType.map(item => ({
-                          value: item.occupiedRooms,
-                          name: item.roomType.charAt(0).toUpperCase() + item.roomType.slice(1)
-                        })))}
-                      </div>
-                    </ChartContainer>
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-muted-foreground">No occupancy data available</p>
-                    </div>
-                  )}
-                </div>
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="value" stroke="#0088FE" activeDot={{ r: 8 }} name="Occupancy" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
-            <Card className="col-span-1">
+
+            <Card className="bg-white">
               <CardHeader>
                 <CardTitle>Revenue Breakdown</CardTitle>
-                <CardDescription>{formatDateRange()}</CardDescription>
+                <CardDescription>Revenue by payment method</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  {isLoading ? (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-muted-foreground">Loading chart data...</p>
-                    </div>
-                  ) : revenueByRoomType.length > 0 ? (
-                  <ChartContainer
-                    className="h-full w-full"
-                    config={{
-                      tooltip: {
-                        trigger: "axis",
-                        axisPointer: {
-                            type: "shadow"
-                          },
-                          formatter: function(params: any) {
-                            let total = 0;
-                            let result = `${params[0].name}<br/>`;
-                            
-                            params.forEach((param: any) => {
-                              total += param.value;
-                              result += `${param.seriesName}: ${formatCurrency(param.value)}<br/>`;
-                            });
-                            
-                            result += `<strong>Total: ${formatCurrency(total)}</strong>`;
-                            return result;
-                          }
-                      },
-                      legend: {
-                          data: ["Room Revenue", "F&B Revenue", "Other Revenue"]
-                      },
-                      grid: {
-                        left: "3%",
-                        right: "4%",
-                        bottom: "3%",
-                          containLabel: true
-                      },
-                      xAxis: {
-                        type: "value",
-                          axisLabel: {
-                            formatter: (value: number) => formatCurrency(value)
-                          }
-                      },
-                      yAxis: {
-                        type: "category",
-                          data: revenueByRoomType.map(item => 
-                            item.roomType.charAt(0).toUpperCase() + item.roomType.slice(1)
-                          )
-                        },
-                      }}
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={
+                          revenueData?.revenueByPaymentMethod?.map((item: any, index: number) => ({
+                            name:
+                              item._id === "credit_card"
+                                ? "Credit Card"
+                                : item._id === "cash"
+                                  ? "Cash"
+                                  : item._id === "corporate"
+                                    ? "Corporate"
+                                    : item._id,
+                            value: item.revenue,
+                          })) || []
+                        }
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {revenueData?.revenueByPaymentMethod?.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        )) || []}
+                      </Pie>
+                      <Tooltip formatter={(value) => (typeof value === "number" ? `$${value.toFixed(2)}` : value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Occupancy Tab */}
+        <TabsContent value="occupancy" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricCard
+              title="Occupancy Rate"
+              value={occupancyData ? `${occupancyData.occupancyRate.toFixed(1)}%` : "0%"}
+              description="Current hotel occupancy"
+              isLoading={isLoading}
+            />
+            <MetricCard title="Total Rooms" value={occupancyData?.totalRooms || 0} isLoading={isLoading} />
+            <MetricCard title="Occupied Rooms" value={occupancyData?.occupiedRooms || 0} isLoading={isLoading} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Daily Occupancy</CardTitle>
+                <CardDescription>Room occupancy by day</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={
+                        occupancyData?.dailyOccupancy?.map((item: any) => ({
+                          date: item._id,
+                          occupancy: item.count,
+                        })) || []
+                      }
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      {/* Chart requires children */}
-                      <div className="h-full">
-                        {/* Stack bar chart data would be processed here */}
-                        {JSON.stringify({
-                          roomRevenue: revenueByRoomType.map(item => item.roomRevenue),
-                          fbRevenue: revenueByRoomType.map(item => item.fbRevenue),
-                          otherRevenue: revenueByRoomType.map(item => item.otherRevenue)
-                        })}
-                      </div>
-                    </ChartContainer>
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-muted-foreground">No revenue data available</p>
-                    </div>
-                  )}
-                </div>
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="occupancy"
+                        stroke="#0088FE"
+                        activeDot={{ r: 8 }}
+                        name="Occupancy"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Room Type Distribution</CardTitle>
+                <CardDescription>Distribution of bookings by room type</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={
+                        occupancyData?.roomTypeDistribution?.map((item: any) => ({
+                          name: item._id,
+                          value: item.count,
+                        })) || []
+                      }
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="value" name="Count" fill="#0088FE" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Revenue Tab */}
+        <TabsContent value="revenue" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricCard
+              title="Total Revenue"
+              value={revenueData ? `$${revenueData.totalRevenue.toFixed(2)}` : "$0.00"}
+              isLoading={isLoading}
+            />
+            <MetricCard
+              title="ADR (Average Daily Rate)"
+              value={revenueData ? `$${revenueData.adr.toFixed(2)}` : "$0.00"}
+              description="Revenue per occupied room"
+              isLoading={isLoading}
+            />
+            <MetricCard
+              title="RevPAR"
+              value={
+                revenueData && typeof revenueData.revpar === "number"
+                  ? `$${revenueData.revpar.toFixed(2)}`
+                  : "$0.00"
+              }
+              description="Revenue per available room"
+              isLoading={isLoading}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 mt-6">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Daily Revenue</CardTitle>
+                <CardDescription>Revenue trends over time</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={
+                        revenueData?.dailyRevenue?.map((item: any) => ({
+                          date: item._id,
+                          revenue: item.revenue,
+                        })) || []
+                      }
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => (typeof value === "number" ? `$${value.toFixed(2)}` : value)} />
+                      <Legend />
+                      <Line type="monotone" dataKey="revenue" stroke="#0088FE" activeDot={{ r: 8 }} name="Revenue" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Daily Occupancy & Revenue</CardTitle>
-              <CardDescription>{formatDateRange()}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Revenue by Payment Method</CardTitle>
+                <CardDescription>Breakdown of revenue by payment type</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
                 {isLoading ? (
-                  <div className="flex h-full items-center justify-center">
-                    <p className="text-muted-foreground">Loading chart data...</p>
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                   </div>
-                ) : dailyMetrics.length > 0 ? (
-                <ChartContainer
-                  className="h-full w-full"
-                  config={{
-                    tooltip: {
-                      trigger: "axis",
-                      axisPointer: {
-                        type: "cross",
-                        crossStyle: {
-                          color: "#999"
-                        }
-                      },
-                      formatter: function(params: any) {
-                        let result = `${params[0].name}<br/>`;
-                        
-                        params.forEach((param: any) => {
-                          if (param.seriesName === "Occupancy Rate") {
-                            result += `${param.seriesName}: ${param.value.toFixed(1)}%<br/>`;
-                          } else if (param.seriesName === "ADR") {
-                            result += `${param.seriesName}: ${formatCurrency(param.value)}<br/>`;
-                          } else if (param.seriesName === "Room Revenue") {
-                            result += `${param.seriesName}: ${formatCurrency(param.value)}<br/>`;
-                          } else if (param.seriesName === "Additional Revenue") {
-                            result += `${param.seriesName}: ${formatCurrency(param.value)}<br/>`;
-                          } else if (param.seriesName === "Total Revenue") {
-                            result += `<strong>${param.seriesName}: ${formatCurrency(param.value)}</strong><br/>`;
-                          }
-                        });
-                        
-                        return result;
-                      }
-                    },
-                    legend: {
-                      data: ["Occupancy Rate", "ADR", "Room Revenue", "Additional Revenue", "Total Revenue"]
-                    },
-                    xAxis: [
-                      {
-                        type: "category",
-                        data: dailyMetrics.map(day => {
-                          const date = new Date(day.date);
-                          return date.toLocaleDateString("en-US", { 
-                            month: "short", 
-                            day: "numeric" 
-                          });
-                        }),
-                        axisPointer: {
-                          type: "shadow"
-                        }
-                      }
-                    ],
-                    yAxis: [
-                      {
-                        type: "value",
-                        name: "Occupancy",
-                        min: 0,
-                        max: 100,
-                        interval: 20,
-                        axisLabel: {
-                          formatter: "{value}%"
-                        }
-                      },
-                      {
-                        type: "value",
-                        name: "Revenue",
-                        min: 0,
-                        axisLabel: {
-                          formatter: "${value}"
-                        }
-                      }
-                    ],
-                    series: [
-                    {
-                      name: "Occupancy Rate",
-                        type: "line",
-                        yAxisIndex: 0,
-                        data: dailyMetrics.map(day => day.occupancyRate),
-                        itemStyle: {
-                          color: "#3B82F6"
-                        }
-                    },
-                    {
-                      name: "ADR",
-                      type: "line",
-                      yAxisIndex: 1,
-                        data: dailyMetrics.map(day => day.adr),
-                        itemStyle: {
-                          color: "#10B981"
-                        }
-                      },
-                      {
-                        name: "Room Revenue",
-                        type: "bar",
-                        yAxisIndex: 1,
-                        stack: "revenue",
-                        data: dailyMetrics.map(day => day.roomRevenue || (day.revenue * 0.75)), // Estimate if not available
-                        itemStyle: {
-                          color: "#7C3AED"
-                        }
-                      },
-                      {
-                        name: "Additional Revenue",
-                        type: "bar",
-                        yAxisIndex: 1,
-                        stack: "revenue",
-                        data: dailyMetrics.map(day => day.additionalRevenue || (day.revenue * 0.25)), // Estimate if not available
-                        itemStyle: {
-                          color: "#EC4899"
-                        }
-                      },
-                      {
-                        name: "Total Revenue",
-                      type: "line",
-                      yAxisIndex: 1,
-                        data: dailyMetrics.map(day => day.revenue),
-                        lineStyle: {
-                          type: "dashed",
-                          color: "#F59E0B"
-                        },
-                        itemStyle: {
-                          color: "#F59E0B"
-                        }
-                      }
-                    ]
-                  }}
-                >
-                  <div className="h-full">
-                    {/* Data is now directly in the config */}
-                  </div>
-                </ChartContainer>
                 ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <p className="text-muted-foreground">No daily metrics available</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="occupancy" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Occupancy Reports</CardTitle>
-              <CardDescription>Detailed occupancy analytics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">Select specific occupancy reports from the filters above.</p>
-              
-              {isLoading ? (
-                <div className="flex h-[200px] items-center justify-center">
-                  <p className="text-muted-foreground">Loading occupancy data...</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="py-2 px-4 text-left">Room Type</th>
-                        <th className="py-2 px-4 text-left">Total Rooms</th>
-                        <th className="py-2 px-4 text-left">Occupied</th>
-                        <th className="py-2 px-4 text-left">Occupancy Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {occupancyByRoomType.map((item, index) => (
-                        <tr key={index} className="border-b">
-                          <td className="py-2 px-4">{item.roomType.charAt(0).toUpperCase() + item.roomType.slice(1)}</td>
-                          <td className="py-2 px-4">{item.totalRooms}</td>
-                          <td className="py-2 px-4">{item.occupiedRooms}</td>
-                          <td className="py-2 px-4">{formatPercentage(item.occupancyRate)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="revenue" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue Reports</CardTitle>
-              <CardDescription>Detailed revenue analytics for {formatDateRange()}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">Revenue breakdown by room type and service category.</p>
-              
-              {isLoading ? (
-                <div className="flex h-[200px] items-center justify-center">
-                  <p className="text-muted-foreground">Loading revenue data...</p>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-2 px-4 text-left">Room Type</th>
-                          <th className="py-2 px-4 text-left">Room Revenue</th>
-                          <th className="py-2 px-4 text-left">F&B Revenue</th>
-                          <th className="py-2 px-4 text-left">Other Revenue</th>
-                          <th className="py-2 px-4 text-left">Total</th>
-                          <th className="py-2 px-4 text-left">Room Nights</th>
-                          <th className="py-2 px-4 text-left">ADR</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {revenueByRoomType.map((item, index) => (
-                          <tr key={index} className="border-b">
-                            <td className="py-2 px-4">{item.roomType.charAt(0).toUpperCase() + item.roomType.slice(1)}</td>
-                            <td className="py-2 px-4">{formatCurrency(item.roomRevenue)}</td>
-                            <td className="py-2 px-4">{formatCurrency(item.fbRevenue)}</td>
-                            <td className="py-2 px-4">{formatCurrency(item.otherRevenue)}</td>
-                            <td className="py-2 px-4 font-medium">{formatCurrency(item.totalRevenue)}</td>
-                            <td className="py-2 px-4">{item.count}</td>
-                            <td className="py-2 px-4">{formatCurrency(item.count > 0 ? item.roomRevenue / item.count : 0)}</td>
-                          </tr>
-                        ))}
-                        {revenueByRoomType.length > 0 && (
-                          <tr className="bg-gray-50">
-                            <td className="py-2 px-4 font-medium">Total</td>
-                            <td className="py-2 px-4 font-medium">
-                              {formatCurrency(revenueByRoomType.reduce((sum, item) => sum + item.roomRevenue, 0))}
-                            </td>
-                            <td className="py-2 px-4 font-medium">
-                              {formatCurrency(revenueByRoomType.reduce((sum, item) => sum + item.fbRevenue, 0))}
-                            </td>
-                            <td className="py-2 px-4 font-medium">
-                              {formatCurrency(revenueByRoomType.reduce((sum, item) => sum + item.otherRevenue, 0))}
-                            </td>
-                            <td className="py-2 px-4 font-medium">
-                              {formatCurrency(revenueByRoomType.reduce((sum, item) => sum + item.totalRevenue, 0))}
-                            </td>
-                            <td className="py-2 px-4 font-medium">
-                              {revenueByRoomType.reduce((sum, item) => sum + item.count, 0)}
-                            </td>
-                            <td className="py-2 px-4 font-medium">
-                              {formatCurrency(
-                                revenueByRoomType.reduce((sum, item) => sum + item.count, 0) > 0 
-                                  ? revenueByRoomType.reduce((sum, item) => sum + item.roomRevenue, 0) / 
-                                    revenueByRoomType.reduce((sum, item) => sum + item.count, 0)
-                                  : 0
-                              )}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-lg font-medium mb-3">Daily Revenue Breakdown</h3>
-                    <div className="h-[400px]">
-                      <ChartContainer
-                        className="h-full w-full"
-                        config={{
-                          tooltip: {
-                            trigger: "axis",
-                            axisPointer: {
-                              type: "shadow"
-                            },
-                            formatter: function(params: any) {
-                              const date = params[0].name;
-                              let total = 0;
-                              let result = `${date}<br/>`;
-                              
-                              params.forEach((param: any) => {
-                                if (param.seriesName !== "Total") {
-                                  total += param.value;
-                                  result += `${param.seriesName}: ${formatCurrency(param.value)}<br/>`;
-                                }
-                              });
-                              
-                              result += `<strong>Total: ${formatCurrency(total)}</strong>`;
-                              return result;
-                            }
-                          },
-                          legend: {
-                            data: ["Room Revenue", "F&B Revenue", "Other Revenue"]
-                          },
-                          xAxis: {
-                            type: "category",
-                            data: dailyMetrics.map(day => {
-                              const date = new Date(day.date);
-                              return date.toLocaleDateString("en-US", { 
-                                month: "short", 
-                                day: "numeric" 
-                              });
-                            })
-                          },
-                          yAxis: {
-                            type: "value",
-                            name: "Revenue",
-                            axisLabel: {
-                              formatter: "${value}"
-                            }
-                          },
-                          series: [
-                            {
-                              name: "Room Revenue",
-                              type: "bar",
-                              stack: "revenue",
-                              emphasis: {
-                                focus: "series"
-                              },
-                              data: dailyMetrics.map(day => day.roomRevenue || (day.revenue * 0.7)),
-                              itemStyle: {
-                                color: "#7C3AED"
-                              }
-                            },
-                            {
-                              name: "F&B Revenue",
-                              type: "bar",
-                              stack: "revenue",
-                              emphasis: {
-                                focus: "series"
-                              },
-                              data: dailyMetrics.map(day => 
-                                day.additionalRevenue 
-                                  ? day.additionalRevenue * 0.6 
-                                  : day.revenue * 0.2
-                              ),
-                              itemStyle: {
-                                color: "#EC4899"
-                              }
-                            },
-                            {
-                              name: "Other Revenue",
-                              type: "bar",
-                              stack: "revenue",
-                              emphasis: {
-                                focus: "series"
-                              },
-                              data: dailyMetrics.map(day => 
-                                day.additionalRevenue 
-                                  ? day.additionalRevenue * 0.4 
-                                  : day.revenue * 0.1
-                              ),
-                              itemStyle: {
-                                color: "#F59E0B"
-                              }
-                            }
-                          ]
-                        }}
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={
+                          revenueData?.revenueByPaymentMethod?.map((item: any, index: number) => ({
+                            name:
+                              item._id === "credit_card"
+                                ? "Credit Card"
+                                : item._id === "cash"
+                                  ? "Cash"
+                                  : item._id === "corporate"
+                                    ? "Corporate"
+                                    : item._id,
+                            value: item.revenue,
+                          })) || []
+                        }
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                       >
-                        <div className="h-full" />
-                      </ChartContainer>
-                    </div>
+                        {revenueData?.revenueByPaymentMethod?.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        )) || []}
+                      </Pie>
+                      <Tooltip formatter={(value) => (typeof value === "number" ? `$${value.toFixed(2)}` : value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Revenue by Line Item</CardTitle>
+                <CardDescription>Revenue breakdown by charge type</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: "Room Charges", value: 3500 },
+                        { name: "Room Service", value: 850 },
+                        { name: "Add-ons", value: 1200 },
+                        { name: "Other", value: 450 },
+                      ]}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => `$${value}`} />
+                      <Legend />
+                      <Bar dataKey="value" name="Revenue" fill="#0088FE" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
-        <TabsContent value="guests" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Guest Reports</CardTitle>
-              <CardDescription>Detailed guest analytics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Guest analytics features are coming soon.</p>
-            </CardContent>
-          </Card>
+
+        {/* Guests Tab */}
+        <TabsContent value="guests" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <MetricCard title="Total Guests" value={guestData?.totalGuests || 0} isLoading={isLoading} />
+            <MetricCard
+              title="New Guests"
+              value={guestData?.newVsRepeatGuests?.find((item: any) => item._id === false)?.count || 0}
+              isLoading={isLoading}
+            />
+            <MetricCard
+              title="Repeat Guests"
+              value={guestData?.newVsRepeatGuests?.find((item: any) => item._id === true)?.count || 0}
+              isLoading={isLoading}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Guest Type Distribution</CardTitle>
+                <CardDescription>Corporate vs Individual Guests</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={
+                          guestData?.guestTypeDistribution?.map((item: any) => ({
+                            name: item._id ? "Corporate" : "Individual",
+                            value: item.count,
+                          })) || []
+                        }
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        <Cell fill="#0088FE" />
+                        <Cell fill="#00C49F" />
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle>Top Nationalities</CardTitle>
+                <CardDescription>Guest distribution by nationality</CardDescription>
+              </CardHeader>
+              <CardContent className="h-80">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={
+                        guestData?.nationalityDistribution?.map((item: any) => ({
+                          name: item._id,
+                          value: item.count,
+                        })) || []
+                      }
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      layout="vertical"
+                    >
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={100} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="value" name="Guests" fill="#0088FE" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
   )
 }
-
-
