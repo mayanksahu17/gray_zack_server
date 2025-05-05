@@ -106,6 +106,95 @@ export const getCheckoutDetails = async (req: Request, res: Response): Promise<v
   }
 };
 
+/**
+ * Get checkout details by booking ID
+ */
+export const getCheckoutDetailsByBooking = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { bookingId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid booking ID format' 
+      });
+      return;
+    }
+
+    // Find the booking and populate related data
+    const booking = await Booking.findOne({
+      _id: bookingId,
+      status: BookingStatus.CHECKED_IN
+    })
+    .populate('roomId')
+    .populate({
+      path: 'guestId',
+      select: 'personalInfo'
+    });
+
+    if (!booking) {
+      res.status(404).json({ 
+        success: false, 
+        error: 'Active booking not found' 
+      });
+      return;
+    }
+
+    // Get room service charges
+    const roomServices = await RoomService.find({
+      bookingId: booking._id,
+      addedToInvoice: false
+    }).populate('orderId');
+
+    // Calculate totals
+    const roomServiceTotal = roomServices.reduce((sum, service) => sum + service.amount, 0);
+    
+    // Calculate room charges
+    const checkInDate = new Date(booking.checkIn);
+    const today = new Date();
+    const nightsStayed = Math.ceil((today.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    const roomRate = (booking.roomId as any).pricePerNight;
+    const roomChargeTotal = roomRate * nightsStayed;
+
+    // Get add-on charges
+    const addOnTotal = booking.addOns.reduce((sum, addon) => sum + addon.cost, 0);
+
+    // Calculate grand total
+    const subtotal = roomChargeTotal + roomServiceTotal + addOnTotal;
+    const taxRate = 0.10; // 10% tax rate
+    const taxAmount = subtotal * taxRate;
+    const grandTotal = subtotal + taxAmount;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        guest: booking.guestId,
+        booking,
+        room: booking.roomId,
+        roomServices,
+        summary: {
+          nightsStayed,
+          roomRate,
+          roomChargeTotal,
+          roomServiceTotal,
+          addOnTotal,
+          subtotal,
+          taxAmount,
+          grandTotal,
+          alreadyPaid: booking.payment.paidAmount,
+          remainingBalance: grandTotal - booking.payment.paidAmount
+        }
+      }
+    });
+  } catch (err: any) {
+    console.error('Error fetching checkout details by booking:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: err.message || 'Server error' 
+    });
+  }
+};
+
 // Process payment with PaidYET
 const processPaidYETPayment = async (amount: number, cardDetails: any, description: string) => {
   try {
@@ -490,4 +579,4 @@ export const getCheckoutHistory = async (req: Request, res: Response): Promise<v
     console.error('Error fetching checkout history:', err);
     res.status(500).json({ error: err.message || 'Server error' });
   }
-}; 
+};
