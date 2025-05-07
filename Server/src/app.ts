@@ -1,7 +1,7 @@
 import express, { Express, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-
+import {setupSwagger} from './swagger'
 const app: Express = express();
 const whitelist = [
   // 'http://localhost:3000',
@@ -16,7 +16,6 @@ const whitelist = [
   'http://16.171.47.60:3003',
   'http://16.171.47.60:3004',
 ];
-
 app.use(cors({
   origin: function (origin, callback) {
     // allow requests with no origin (like mobile apps or curl)
@@ -63,6 +62,7 @@ import reportRoutes from './routes/report.route'
 import overviewPaymentRoutes from './routes/overview.payment.route'
 import dashboardRoutes from './routes/dashboard.routes'
 import searchRoutes from './routes/search.route'
+// import { setupSwagger } from './swagger';
 
 app.use('/api/v1.0/admin', adminRouter)
 app.use('/api/v1/admin/hotels', hotelAdminRouter)
@@ -83,5 +83,6 @@ app.use('/api/v1/hotel', hotelAdminRouter)
 app.use('/api/v1/reports', reportRoutes)
 app.use('/api', dashboardRoutes)
 app.use('/api/search', searchRoutes)
+setupSwagger(app);
 
 export default app

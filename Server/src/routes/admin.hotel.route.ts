@@ -1,5 +1,4 @@
 import { Router } from 'express'
-import { Request, Response } from 'express'
 import { verifyJWT } from "../middleware/auth.middleware";
 import { authorizePermission } from "../middleware/authorize.middleware";
 import { AdminRole, AdminPermission } from '../models/administrator.model';
@@ -19,7 +18,30 @@ import {
 
 const router: Router = Router();
 
-// Hotel Profile Management
+/**
+ * @swagger
+ * /api/v1/admin/hotels/create:
+ *   post:
+ *     summary: Create a new hotel
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               hotelImages:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       201:
+ *         description: Hotel created
+ */
 router.post(
   "/create",
   verifyJWT,
@@ -28,6 +50,36 @@ router.post(
   createHotel
 );
 
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/profile:
+ *   put:
+ *     summary: Update hotel profile
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               hotelImages:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       200:
+ *         description: Hotel profile updated
+ */
 router.put(
   "/:hotelId/profile",
   verifyJWT,
@@ -36,7 +88,24 @@ router.put(
   updateHotelProfile
 );
 
-// Staff Management
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/roles:
+ *   post:
+ *     summary: Create staff roles
+ *     tags: [Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: Staff role created
+ */
 router.post(
   "/:hotelId/roles",
   verifyJWT,
@@ -44,6 +113,38 @@ router.post(
   createStaffRole
 );
 
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/staff:
+ *   post:
+ *     summary: Add or update hotel staff
+ *     tags: [Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Staff updated
+ *   get:
+ *     summary: Get all hotel staff
+ *     tags: [Staff]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of hotel staff
+ */
 router.post(
   "/:hotelId/staff",
   verifyJWT,
@@ -58,7 +159,24 @@ router.get(
   getAllHotelStaff
 );
 
-// Analytics and Revenue
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/analytics:
+ *   get:
+ *     summary: Get hotel analytics
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Analytics data
+ */
 router.get(
   "/:hotelId/analytics",
   verifyJWT,
@@ -66,6 +184,24 @@ router.get(
   getHotelAnalytics
 );
 
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/revenue:
+ *   get:
+ *     summary: Get hotel revenue data
+ *     tags: [Analytics]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Revenue data
+ */
 router.get(
   "/:hotelId/revenue",
   verifyJWT,
@@ -73,7 +209,24 @@ router.get(
   getHotelRevenue
 );
 
-// Get hotel alerts
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/alerts:
+ *   get:
+ *     summary: Get hotel alerts
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of alerts
+ */
 router.get(
   "/:hotelId/alerts",
   verifyJWT,
@@ -81,7 +234,24 @@ router.get(
   getHotelAlerts
 );
 
-// Plan Management
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}/upgrade-plan:
+ *   post:
+ *     summary: Upgrade hotel subscription plan
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Plan upgraded
+ */
 router.post(
   "/:hotelId/upgrade-plan",
   verifyJWT,
@@ -89,6 +259,24 @@ router.post(
   upgradePlan
 );
 
+/**
+ * @swagger
+ * /api/v1/admin/hotels/{hotelId}:
+ *   get:
+ *     summary: Get hotel details
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: hotelId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Hotel details
+ */
 router.get(
   "/:hotelId",
   verifyJWT,
@@ -96,4 +284,4 @@ router.get(
   getHotelDetails
 );
 
-export default router
+export default router;

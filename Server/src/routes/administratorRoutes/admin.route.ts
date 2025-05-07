@@ -14,32 +14,135 @@ import { AdminPermission, AdminRole } from '../../models/administrator.model';
 
 const router = Router();
 
-// Public route
+/**
+ * @swagger
+ * /api/v1.0/admin/login:
+ *   post:
+ *     summary: Login administrator
+ *     tags: [Administrator]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successful login
+ */
 router.route("/login").post(loginAdministrator);
+
+/**
+ * @swagger
+ * /api/v1.0/admin/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Administrator]
+ *     responses:
+ *       200:
+ *         description: Token refreshed
+ */
 router.route("/refresh-token").post(refreshAccessToken);
+
+/**
+ * @swagger
+ * /api/v1.0/admin/logout:
+ *   post:
+ *     summary: Logout administrator
+ *     tags: [Administrator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully logged out
+ */
 router.route("/logout").post(verifyJWT, logout);
 
-// Protected routes
-// Only system admins can create new administrators
-router.route("/initialize")
-    .post(createAdministrator);
+/**
+ * @swagger
+ * /api/v1.0/admin/initialize:
+ *   post:
+ *     summary: Initialize system admin (first-time setup)
+ *     tags: [Administrator]
+ *     responses:
+ *       201:
+ *         description: Administrator created
+ */
+router.route("/initialize").post(createAdministrator);
 
-router.route("/create")
-    .post(
-        verifyJWT,
-        authorizePermission([AdminRole.SYSTEM_ADMIN]),
-        createAdministrator
-    );
+/**
+ * @swagger
+ * /api/v1.0/admin/create:
+ *   post:
+ *     summary: Create new administrator
+ *     tags: [Administrator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Administrator created
+ */
+router.route("/create").post(
+    verifyJWT,
+    authorizePermission([AdminRole.SYSTEM_ADMIN]),
+    createAdministrator
+);
 
-// Get all administrators (requires manage_users permission)
-router.route("/")
-    .post(
-        verifyJWT,
-        authorizePermission([AdminRole.SYSTEM_ADMIN], [AdminPermission.MANAGE_USERS]),
-        getAdministrators
-    );
+/**
+ * @swagger
+ * /api/v1.0/admin:
+ *   post:
+ *     summary: Get all administrators
+ *     tags: [Administrator]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of administrators
+ */
+router.route("/").post(
+    verifyJWT,
+    authorizePermission([AdminRole.SYSTEM_ADMIN], [AdminPermission.MANAGE_USERS]),
+    getAdministrators
+);
 
-// Update and delete routes (requires system_admin role)
+/**
+ * @swagger
+ * /api/v1.0/admin/{id}:
+ *   put:
+ *     summary: Update administrator by ID
+ *     tags: [Administrator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Administrator updated
+ *   delete:
+ *     summary: Delete administrator by ID
+ *     tags: [Administrator]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Administrator deleted
+ */
 router.route("/:id")
     .put(
         verifyJWT,
