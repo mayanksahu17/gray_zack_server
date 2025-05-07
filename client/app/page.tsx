@@ -46,7 +46,7 @@ if (AuthUtils.hasRole('restaurant_manager')) {
   router.push('/restaurant_manager')
 }else if (AuthUtils.hasRole('hotel_owner')) {
    // Do something specific to restaurant manager
-   router.push('/hotel_owner')
+   router.push('/manager_dashboard')
 }
 else if (AuthUtils.hasRole('housekeeper')) {
    // Do something specific to restaurant manager
