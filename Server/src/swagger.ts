@@ -31,8 +31,7 @@ const swaggerOptions = {
   },
 
   // ✅ This includes all .ts files inside /routes and its subfolders
-  apis: [path.join(__dirname, 'routes/**/*.ts')],
-};
+  apis: [path.join(process.cwd(), 'src/routes/**/*.ts')],};
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 console.log(swaggerSpec);
