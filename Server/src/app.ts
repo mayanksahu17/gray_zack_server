@@ -4,7 +4,7 @@ import cors from 'cors';
 import {setupSwagger} from './swagger'
 const app: Express = express();
 const whitelist = [
-  // 'http://localhost:3000',
+  'http://localhost:3000',
   // 'http://localhost:3001',
   // 'http://localhost:3002',
   'http://13.53.43.124:3000',
