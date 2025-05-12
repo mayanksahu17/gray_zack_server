@@ -9,9 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components_m2/ui/tab
 import { staffData } from "@/lib/mock-data"
 import { BarChart, PieChart } from "@/components_m2/ui/chart"
 import { Progress } from "@/components_m2/ui/progress"
+import { useState } from 'react';
+import axios from 'axios';
 
 export default function StaffPage() {
   const { staff, performanceByRole, staffByShift } = staffData
+  const [form, setForm] = useState({ name: '', email: '', phone: '', role: '', permissions: '' });
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -42,6 +48,30 @@ export default function StaffPage() {
     { shift: "Night", count: staffByShift.night },
   ]
 
+  const handleChange = (e: any) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    setSuccess('');
+    setError('');
+    try {
+      const res = await axios.post(`http://localhost:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`, {
+        ...form,
+        permissions: form.permissions.split(',').map((p) => p.trim()),
+        password: Math.random().toString(36).slice(-8),
+      });
+      setSuccess('Staff created and credentials sent by email.');
+      setForm({ name: '', email: '', phone: '', role: '', permissions: '' });
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Error creating staff');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,6 +83,21 @@ export default function StaffPage() {
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input type="search" placeholder="Search staff..." className="pl-8" />
       </div>
+
+      {/* Staff Creation Form */}
+      <form onSubmit={handleSubmit} className="space-y-4 border p-4 rounded-md">
+        <h2 className="text-xl font-semibold">Add New Staff</h2>
+        <div className="flex gap-4 flex-wrap">
+          <Input name="name" value={form.name} onChange={handleChange} placeholder="Name" required />
+          <Input name="email" value={form.email} onChange={handleChange} placeholder="Email" required type="email" />
+          <Input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone" required />
+          <Input name="role" value={form.role} onChange={handleChange} placeholder="Role (e.g. front_desk)" required />
+          <Input name="permissions" value={form.permissions} onChange={handleChange} placeholder="Permissions (comma separated)" required />
+        </div>
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded" disabled={loading}>{loading ? 'Creating...' : 'Create Staff'}</button>
+        {success && <div className="text-green-600">{success}</div>}
+        {error && <div className="text-red-600">{error}</div>}
+      </form>
 
       <Tabs defaultValue="staff">
         <TabsList>

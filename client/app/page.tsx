@@ -57,6 +57,27 @@ else if (AuthUtils.hasRole('front_desk')) {
    router.push('/front_desk')
 }
 
+useEffect(() => {
+  if (AuthUtils.isAuthenticated()) {
+    const userRole = AuthUtils.getUserRole();
+    switch(userRole) {
+      case 'restaurant_manager':
+        router.push('/restaurant_manager');
+        break;
+      case 'hotel_owner':
+        router.push('/manager_dashboard');
+        break;
+      case 'housekeeper':
+        router.push('/scheck');
+        break;
+      case 'front_desk':
+        router.push('/front_desk');
+        break;
+      default:
+        router.push('/');
+    }
+  }
+}, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,7 +100,7 @@ else if (AuthUtils.hasRole('front_desk')) {
     }
 
     try {
-      const response = await fetch('http://16.171.47.60:8000/api/v1/staff/hotel/login', {
+      const response = await fetch('http://localhost:8000/api/v1/staff/hotel/login', {
         method: 'POST',
         credentials: 'include', // Important for handling cookies
         headers: {
@@ -118,6 +139,12 @@ else if (AuthUtils.hasRole('front_desk')) {
         switch(result.data.role) {
           case 'restaurant_manager':
             router.push('/restaurant_manager')
+            break
+          case 'hotel_owner':
+            router.push('/manager_dashboard')
+            break
+          case 'housekeeper':
+            router.push('/scheck')
             break
           case 'front_desk':
             router.push('/front_desk')
@@ -240,17 +267,12 @@ else if (AuthUtils.hasRole('front_desk')) {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="remember"
-                checked={rememberMe}
-                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                disabled={isLocked}
-                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-              />
-              <Label htmlFor="remember" className="text-sm text-blue-700 cursor-pointer">
-                Remember me
-              </Label>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center">
+                <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={setRememberMe} />
+                <Label htmlFor="rememberMe" className="ml-2 text-blue-800">Remember me</Label>
+              </div>
+              <Link href="/reset-password" className="text-blue-600 hover:underline text-sm">Forgot password?</Link>
             </div>
 
             {errors.general && (

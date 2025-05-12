@@ -5,7 +5,10 @@ import {
   updateStaff,
   deleteStaff,
   refreshToken,
-  logoutStaff
+  logoutStaff,
+  changePassword,
+  requestPasswordReset,
+  resetPassword
 } from '../controller/staff.controller';
 import { verifyJWT } from '../middleware/auth.middleware';
 import { authorizeStaff } from '../middleware/authorize.middleware';
@@ -128,5 +131,10 @@ router.delete("/:id", authorizeStaff(['HOTEL_OWNER', 'ADMIN']), deleteStaff);
  *         description: Staff logged out
  */
 router.post("/logout", logoutStaff);
+
+// Password management endpoints
+router.post('/change-password', changePassword); // protected
+router.post('/request-reset', requestPasswordReset); // public
+router.post('/reset-password', resetPassword); // public
 
 export default router;

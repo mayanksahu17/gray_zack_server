@@ -4,6 +4,8 @@ import { ApiError } from '../utills/ApiError';
 import { asyncHandler } from '../utills/asyncHandler';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
+import { auth } from '../lib/mail-service/nodemailer';
 
 const generateTokens = async (userId: string) => {
   try {
@@ -232,4 +234,53 @@ export const logoutStaff = asyncHandler(async (req: Request, res: Response) => {
     success: true,
     message: "Logged out successfully"
   });
+});
+
+// Change password
+export const changePassword = asyncHandler(async (req: Request, res: Response) => {
+  const userId = (req.user as IStaffDocument)._id;
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, 'Old and new password are required');
+  }
+  const staff = await Staff.findById(userId).select('+password');
+  if (!staff) throw new ApiError(404, 'User not found');
+  const isMatch = await staff.comparePassword(oldPassword);
+  if (!isMatch) throw new ApiError(401, 'Old password is incorrect');
+  staff.password = newPassword;
+  await staff.save();
+  return res.status(200).json({ success: true, message: 'Password changed successfully' });
+});
+
+// Request password reset
+let resetTokens: { [email: string]: string } = {};
+export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email) throw new ApiError(400, 'Email is required');
+  const staff = await Staff.findOne({ email });
+  if (!staff) throw new ApiError(404, 'User not found');
+  const token = crypto.randomBytes(32).toString('hex');
+  resetTokens[email] = token;
+  // Send email with token (reuse nodemailer)
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+  await auth.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: 'Password Reset Request',
+    html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link is valid for one use.</p>`
+  });
+  return res.status(200).json({ success: true, message: 'Password reset email sent' });
+});
+
+// Reset password
+export const resetPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email, token, newPassword } = req.body;
+  if (!email || !token || !newPassword) throw new ApiError(400, 'All fields are required');
+  if (resetTokens[email] !== token) throw new ApiError(400, 'Invalid or expired token');
+  const staff = await Staff.findOne({ email }).select('+password');
+  if (!staff) throw new ApiError(404, 'User not found');
+  staff.password = newPassword;
+  await staff.save();
+  delete resetTokens[email];
+  return res.status(200).json({ success: true, message: 'Password reset successfully' });
 });

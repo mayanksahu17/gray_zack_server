@@ -10,11 +10,11 @@ const whitelist = [
   'http://13.53.43.124:3000',
   // 'https://gray-zack-113j.vercel.app',
   // 'https://gray-zack.vercel.app',
-  // 'http://16.171.47.60:3000',
-  'http://16.171.47.60:3001',
-  'http://16.171.47.60:3002',
-  'http://16.171.47.60:3003',
-  'http://16.171.47.60:3004',
+  // 'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:3003',
+  'http://localhost:3004',
 ];
 app.use(cors({
   origin: function (origin, callback) {

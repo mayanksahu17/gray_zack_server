@@ -36,7 +36,7 @@ export function GuestHistoryView() {
     setSelectedGuest(null)
 
     try {
-      const res = await fetch(`http://16.171.47.60:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
       const data = await res.json()
       
       // Flatten and format search results
@@ -67,7 +67,7 @@ export function GuestHistoryView() {
 
     // Fetch booking history for selected guest
     try {
-      const bookingRes = await fetch(`http://16.171.47.60:8000/api/v1/booking/guest/${result.id}`)
+      const bookingRes = await fetch(`http://localhost:8000/api/v1/booking/guest/${result.id}`)
       const bookingData = await bookingRes.json()
       
       if (Array.isArray(bookingData)) {
