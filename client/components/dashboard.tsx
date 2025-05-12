@@ -48,7 +48,7 @@ export default function Dashboard({ onNewOrder }: { onNewOrder: () => void }) {
         setIsLoading(true);
         
         // Fetch restaurant tables
-        const tablesResponse = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`);
+        const tablesResponse = await fetch(`http://56.228.32.222:8000/api/v1/admin/hotel/restaurant/${restaurantId}/tables`);
         const tablesData = await tablesResponse.json();
         
         if (!tablesData.success) {
@@ -59,7 +59,7 @@ export default function Dashboard({ onNewOrder }: { onNewOrder: () => void }) {
         const totalTables = tablesData.data.length;
 
         // Fetch recent orders
-        const ordersResponse = await fetch(`http://16.171.47.60:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders`);
+        const ordersResponse = await fetch(`http://56.228.32.222:8000/api/v1/admin/hotel/restaurant/${restaurantId}/orders`);
         const ordersData = await ordersResponse.json();
         
         if (!ordersData.success) {

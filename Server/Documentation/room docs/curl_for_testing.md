@@ -2,7 +2,7 @@
 # Hotel Room API cURL Testing Examples
 
 # Base URL
-BASE_URL="http://16.171.47.60:8000/api/v1/room"
+BASE_URL="http://56.228.32.222:8000/api/v1/room"
 
 # Your JWT token (replace with actual token)
 TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

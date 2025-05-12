@@ -97,7 +97,7 @@ export function CheckOutView() {
     setCheckoutDetails(null)
     setCheckoutSuccess(false)
     try {
-      const res = await fetch(`http://16.171.47.60:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const res = await fetch(`http://56.228.32.222:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
       const data = await res.json()
       // Flatten and group results for selection
       const results: any[] = []
@@ -149,14 +149,14 @@ export function CheckOutView() {
       }
 
       // Always fetch all bookings for this guest
-      const bookingsRes = await fetch(`http://16.171.47.60:8000/api/v1/booking/guest/${userId}`)
+      const bookingsRes = await fetch(`http://56.228.32.222:8000/api/v1/booking/guest/${userId}`)
       const bookingsData = await bookingsRes.json()
       if (Array.isArray(bookingsData)) {
         // Find checked-in booking
         const checkedInBooking = bookingsData.find((b: any) => b.status === 'checked_in')
         if (checkedInBooking) {
           // Fetch checkout details by booking ID
-          const res = await fetch(`http://16.171.47.60:8000/api/v1/checkout/details/booking/${checkedInBooking._id}`)
+          const res = await fetch(`http://56.228.32.222:8000/api/v1/checkout/details/booking/${checkedInBooking._id}`)
           const data = await res.json()
           if (!data.success) throw new Error(data.error || 'No active reservation found')
           setCheckoutDetails(data.data)
@@ -188,7 +188,7 @@ export function CheckOutView() {
     setCheckoutLoading(true)
     setError("")
     try {
-      const res = await fetch('http://16.171.47.60:8000/api/v1/checkout/process', {
+      const res = await fetch('http://56.228.32.222:8000/api/v1/checkout/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -358,7 +358,7 @@ export function CheckOutView() {
                     onClick={async () => {
                       // Try to fetch checkout details for this booking
                       try {
-                        const res = await fetch(`http://16.171.47.60:8000/api/v1/checkout/details/booking/${booking._id}`)
+                        const res = await fetch(`http://56.228.32.222:8000/api/v1/checkout/details/booking/${booking._id}`)
                         const data = await res.json()
                         if (!data.success) throw new Error(data.error || 'No active reservation found')
                         setCheckoutDetails(data.data)
