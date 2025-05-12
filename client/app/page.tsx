@@ -100,7 +100,7 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/staff/hotel/login', {
+      const response = await fetch('http://56.228.32.222:8000/api/v1/staff/hotel/login', {
         method: 'POST',
         credentials: 'include', // Important for handling cookies
         headers: {

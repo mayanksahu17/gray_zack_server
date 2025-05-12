@@ -58,7 +58,7 @@ export default function StaffPage() {
     setSuccess('');
     setError('');
     try {
-      const res = await axios.post(`http://localhost:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`, {
+      const res = await axios.post(`http://56.228.32.222:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`, {
         ...form,
         permissions: form.permissions.split(',').map((p) => p.trim()),
         password: Math.random().toString(36).slice(-8),

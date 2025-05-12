@@ -18,7 +18,7 @@ import { useToast } from "./ui/use-toast"
 import { useRouter } from "next/navigation"
 // import { BASE_URL as API_BASE_URL } from "@/lib/constants"
 // API endpoints
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "http://56.228.32.222:8000/api/v1";
 const ROOM_API = `${API_BASE_URL}/room`;
 const GUEST_API = `${API_BASE_URL}/guest`;
 const BOOKING_API = `${API_BASE_URL}/reservation`;
@@ -219,7 +219,7 @@ export function CheckInView() {
         cardInfo.expiryDate : 
         cardInfo.expiryDate.replace(/(\d{2})(\d{2})/, '$1/$2');
       
-      const res = await fetch("http://localhost:8000/api/v1/payment/make-payment", {
+      const res = await fetch("http://56.228.32.222:8000/api/v1/payment/make-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
