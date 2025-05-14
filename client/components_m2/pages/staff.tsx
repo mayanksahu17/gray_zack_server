@@ -19,6 +19,22 @@ export default function StaffPage() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
+  const roleOptions = [
+    { value: 'front_desk', label: 'Front Desk' },
+    { value: 'housekeeper', label: 'Housekeeper' },
+    { value: 'restaurant_manager', label: 'Restaurant Manager' },
+    { value: 'spa_manager', label: 'Spa Manager' },
+    { value: 'hotel_owner', label: 'Hotel Owner' },
+    { value: 'admin', label: 'Admin' },
+  ];
+  const permissionOptions = [
+    { value: 'clean_rooms', label: 'Clean Rooms' },
+    { value: 'manage_bookings', label: 'Manage Bookings' },
+    { value: 'view_reports', label: 'View Reports' },
+    // Add more as needed
+  ];
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "On Duty":
@@ -58,13 +74,19 @@ export default function StaffPage() {
     setSuccess('');
     setError('');
     try {
-      const res = await axios.post(`http://localhost:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`, {
-        ...form,
-        permissions: form.permissions.split(',').map((p) => p.trim()),
-        password: Math.random().toString(36).slice(-8),
-      });
+      const token = typeof window !== 'undefined' ? require('js-cookie').get('adminAccessToken') : '';
+      const res = await axios.post(
+        `http://localhost:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`,
+        {
+          ...form,
+          permissions: selectedPermissions,
+          password: Math.random().toString(36).slice(-8),
+        },
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+      );
       setSuccess('Staff created and credentials sent by email.');
       setForm({ name: '', email: '', phone: '', role: '', permissions: '' });
+      setSelectedPermissions([]);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Error creating staff');
     } finally {
@@ -91,8 +113,30 @@ export default function StaffPage() {
           <Input name="name" value={form.name} onChange={handleChange} placeholder="Name" required />
           <Input name="email" value={form.email} onChange={handleChange} placeholder="Email" required type="email" />
           <Input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone" required />
-          <Input name="role" value={form.role} onChange={handleChange} placeholder="Role (e.g. front_desk)" required />
-          <Input name="permissions" value={form.permissions} onChange={handleChange} placeholder="Permissions (comma separated)" required />
+          {/* Role dropdown */}
+          <select
+            name="role"
+            value={form.role}
+            onChange={handleChange}
+            required
+            className="border rounded px-2 py-1"
+          >
+            <option value="">Select Role</option>
+            {roleOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          {/* Permissions multi-select */}
+          <select
+            multiple
+            value={selectedPermissions}
+            onChange={e => setSelectedPermissions(Array.from(e.target.selectedOptions, option => option.value))}
+            className="border rounded px-2 py-1"
+          >
+            {permissionOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
         <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded" disabled={loading}>{loading ? 'Creating...' : 'Create Staff'}</button>
         {success && <div className="text-green-600">{success}</div>}
