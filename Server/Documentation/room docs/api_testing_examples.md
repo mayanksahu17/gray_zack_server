@@ -2,7 +2,7 @@
 // You can use these examples with Postman, Thunder Client, or any API testing tool
 
 // Base URL
-const baseUrl = "http://56.228.32.222:8000/api/v1/room";
+const baseUrl = "http://localhost:8000/api/v1/room";
 
 // Authentication JWT token (replace with your actual token)
 const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";

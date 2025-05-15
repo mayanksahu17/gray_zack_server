@@ -22,7 +22,6 @@ import {
   SidebarMenuItem,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import type { TabType } from "@/components/dashboard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,10 +32,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import AuthUtils from "@/utills/authUtills"
 
 interface DashboardSidebarProps {
-  activeTab: TabType
-  setActiveTab: (tab: TabType) => void
+  activeTab: string
+  setActiveTab: (tab: string) => void
 }
 
 export default function DashboardSidebar({ activeTab, setActiveTab }: DashboardSidebarProps) {
@@ -52,7 +52,9 @@ export default function DashboardSidebar({ activeTab, setActiveTab }: DashboardS
     { id: "marketing", label: "Marketing", icon: LineChart },
     { id: "settings", label: "Settings", icon: Settings },
   ]
-
+  const user = AuthUtils.getUserData();
+  const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'JD';
+  const displayName = user?.name || 'Staff';
   return (
     <Sidebar>
       <SidebarHeader className="flex items-center justify-between p-4">
@@ -66,7 +68,7 @@ export default function DashboardSidebar({ activeTab, setActiveTab }: DashboardS
         <SidebarMenu>
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.id}>
-              <SidebarMenuButton isActive={activeTab === item.id} onClick={() => setActiveTab(item.id as TabType)}>
+              <SidebarMenuButton isActive={activeTab === item.id} onClick={() => setActiveTab(item.id)}>
                 <item.icon className="h-5 w-5" />
                 <span>{item.label}</span>
               </SidebarMenuButton>
@@ -80,9 +82,9 @@ export default function DashboardSidebar({ activeTab, setActiveTab }: DashboardS
             <Button variant="ghost" className="w-full justify-start gap-2">
               <Avatar className="h-6 w-6">
                 <AvatarImage src="/placeholder-user.jpg" alt="User" />
-                <AvatarFallback>JD</AvatarFallback>
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
-              <span>John Doe</span>
+              <span>{displayName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -91,7 +93,7 @@ export default function DashboardSidebar({ activeTab, setActiveTab }: DashboardS
             <DropdownMenuItem>Profile</DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={AuthUtils.logout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>

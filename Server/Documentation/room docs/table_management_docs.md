@@ -2,7 +2,7 @@
 
 ## Base URL
 ```
-http://56.228.32.222:8000/api/restaurants
+http://localhost:8000/api/restaurants
 ```
 
 ## Authentication
@@ -360,7 +360,7 @@ You can import the following collection into Postman:
 ## Environment Variables
 
 Create a Postman environment with the following variables:
-- `baseUrl`: http://56.228.32.222:8000
+- `baseUrl`: http://localhost:8000
 - `restaurantId`: Your restaurant's ID
 - `tableId`: Table ID for testing
 - `token`: Your JWT token

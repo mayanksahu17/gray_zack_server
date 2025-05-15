@@ -1,7 +1,7 @@
 Here's a **complete API documentation** for your Guest-related endpoints with the base URL:
 
 ```
-Base URL: http://56.228.32.222:8000/api/v1/guest/
+Base URL: http://localhost:8000/api/v1/guest/
 ```
 
 ---
@@ -168,14 +168,14 @@ All endpoints below are under the base path: `/api/v1/guest/`
 
 ### ➤ Create Guest
 ```bash
-curl -X POST http://56.228.32.222:8000/api/v1/guest/ \
+curl -X POST http://localhost:8000/api/v1/guest/ \
   -H "Content-Type: application/json" \
   -d '{"hotelId":"...", "personalInfo":{...}, ...}'
 ```
 
 ### ➤ Search Guest by Email
 ```bash
-curl http://56.228.32.222:8000/api/v1/guest/search?email=john@example.com
+curl http://localhost:8000/api/v1/guest/search?email=john@example.com
 ```
 
 ---

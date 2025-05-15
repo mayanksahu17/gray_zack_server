@@ -1,11 +1,11 @@
 # Staff API Testing Documentation
 
-## Base URL: http://56.228.32.222:8000/api/v1/staff
+## Base URL: http://localhost:8000/api/v1/staff
 
 ### 1. Create Staff Member (POST /create)
 Required Role: HOTEL_OWNER or ADMIN
 ```bash
-curl -X POST http://56.228.32.222:8000/api/v1/staff/create \
+curl -X POST http://localhost:8000/api/v1/staff/create \
 -H "Content-Type: application/json" \
 -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 -d '{
@@ -38,7 +38,7 @@ curl -X POST http://56.228.32.222:8000/api/v1/staff/create \
 
 ### 2. Staff Login (POST /login)
 ```bash
-curl -X POST http://56.228.32.222:8000/api/v1/staff/login \
+curl -X POST http://localhost:8000/api/v1/staff/login \
 -H "Content-Type: application/json" \
 -d '{
   "email": "john.doe@hotel.com",
@@ -61,7 +61,7 @@ curl -X POST http://56.228.32.222:8000/api/v1/staff/login \
 ### 3. Get Staff by Hotel (GET /hotel/:hotelId)
 Required Role: HOTEL_OWNER or ADMIN
 ```bash
-curl -X GET "http://56.228.32.222:8000/api/v1/staff/hotel/65f123456789abcdef123456?page=1&limit=10&role=front_desk&status=active" \
+curl -X GET "http://localhost:8000/api/v1/staff/hotel/65f123456789abcdef123456?page=1&limit=10&role=front_desk&status=active" \
 -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 
 # Expected Success Response (200):
@@ -88,7 +88,7 @@ curl -X GET "http://56.228.32.222:8000/api/v1/staff/hotel/65f123456789abcdef1234
 ### 4. Update Staff Member (PUT /:id)
 Required Role: HOTEL_OWNER or ADMIN
 ```bash
-curl -X PUT http://56.228.32.222:8000/api/v1/staff/65f123456789abcdef123457 \
+curl -X PUT http://localhost:8000/api/v1/staff/65f123456789abcdef123457 \
 -H "Content-Type: application/json" \
 -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
 -d '{
@@ -119,7 +119,7 @@ curl -X PUT http://56.228.32.222:8000/api/v1/staff/65f123456789abcdef123457 \
 ### 5. Delete Staff Member (DELETE /:id)
 Required Role: HOTEL_OWNER or ADMIN
 ```bash
-curl -X DELETE http://56.228.32.222:8000/api/v1/staff/65f123456789abcdef123457 \
+curl -X DELETE http://localhost:8000/api/v1/staff/65f123456789abcdef123457 \
 -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 
 # Expected Success Response (200):
@@ -131,7 +131,7 @@ curl -X DELETE http://56.228.32.222:8000/api/v1/staff/65f123456789abcdef123457 \
 
 ### 6. Refresh Token (POST /refresh-token)
 ```bash
-curl -X POST http://56.228.32.222:8000/api/v1/staff/refresh-token \
+curl -X POST http://localhost:8000/api/v1/staff/refresh-token \
 -H "Content-Type: application/json" \
 -d '{
   "refreshToken": "YOUR_REFRESH_TOKEN"
@@ -146,7 +146,7 @@ curl -X POST http://56.228.32.222:8000/api/v1/staff/refresh-token \
 
 ### 7. Logout Staff (POST /logout)
 ```bash
-curl -X POST http://56.228.32.222:8000/api/v1/staff/logout \
+curl -X POST http://localhost:8000/api/v1/staff/logout \
 -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 
 # Expected Success Response (200):

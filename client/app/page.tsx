@@ -51,7 +51,7 @@ if (AuthUtils.hasRole('restaurant_manager')) {
 }
 else if (AuthUtils.hasRole('housekeeper')) {
    // Do something specific to restaurant manager
-   router.push('/housekeeper')
+   router.push('/housekeeper-dashboard')
 }
 else if (AuthUtils.hasRole('front_desk')) {
    // Do something specific to restaurant manager
@@ -69,7 +69,7 @@ useEffect(() => {
         router.push('/manager_dashboard');
         break;
       case 'housekeeper':
-        router.push('/scheck');
+        router.push('/housekeeper-dashboard');
         break;
       case 'front_desk':
         router.push('/front_desk');
@@ -162,7 +162,7 @@ useEffect(() => {
             router.push('/manager_dashboard')
             break
           case 'housekeeper':
-            router.push('/scheck')
+            router.push('/housekeeper-dashboard')
             break
           case 'front_desk':
             router.push('/front_desk')

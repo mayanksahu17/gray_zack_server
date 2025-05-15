@@ -23,7 +23,7 @@ export default function ResetPasswordPage() {
     setError("")
     setMessage("")
     try {
-      const res = await fetch("http://56.228.32.222:8000/api/v1/staff/hotel/request-reset", {
+      const res = await fetch("http://localhost:8000/api/v1/staff/hotel/request-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -44,7 +44,7 @@ export default function ResetPasswordPage() {
     setError("")
     setMessage("")
     try {
-      const res = await fetch("http://56.228.32.222:8000/api/v1/staff/hotel/reset-password", {
+      const res = await fetch("http://localhost:8000/api/v1/staff/hotel/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: emailParam, token, newPassword })

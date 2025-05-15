@@ -102,7 +102,7 @@ export function DashboardView() {
     setShowSearchResults(true)
     setSearchResults([])
     try {
-      const res = await fetch(`http://56.228.32.222:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
+      const res = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(searchQuery)}`)
       const data = await res.json()
       const results: any[] = []
       if (data.guests && data.guests.length > 0) {
@@ -154,7 +154,7 @@ export function DashboardView() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const response = await fetch('http://56.228.32.222:8000/api/dashboard')
+        const response = await fetch('http://localhost:8000/api/dashboard')
         const data = await response.json()
         setDashboardData(data)
         setLoading(false)

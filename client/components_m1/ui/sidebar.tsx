@@ -18,6 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import AuthUtils from "@/utills/authUtills"
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -251,6 +252,28 @@ const Sidebar = React.forwardRef<
             className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
           >
             {children}
+            {/* User Info and Logout */}
+            <div className="flex flex-col items-center p-4 border-t border-red-200 mt-auto">
+              {(() => {
+                const user = AuthUtils.getUserData();
+                const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'FD';
+                const displayName = user?.name || 'Front Desk';
+                return (
+                  <>
+                    <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-bold mb-2">
+                      {initials}
+                    </div>
+                    <div className="text-base font-medium mb-2">{displayName}</div>
+                    <button
+  onClick={AuthUtils.logout}
+  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+>
+  Logout
+</button>     
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </div>
