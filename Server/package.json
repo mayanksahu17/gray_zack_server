@@ -18,7 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@react-email/components": "^0.0.34",
+    "@react-email/components": "^0.0.41",
     "@react-email/render": "^1.0.5",
     "@types/express": "^4.17.21",
     "aws-sdk": "^2.1692.0",
@@ -39,6 +39,8 @@
     "nodemon": "^3.0.1",
     "postcss": "^8.5.3",
     "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "react-jsx": "^1.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",

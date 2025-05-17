@@ -1,13 +1,13 @@
 "use client"
 
 import { Search } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components_m2/ui/card"
-import { Input } from "@/components_m2/ui/input"
-import { Badge } from "@/components_m2/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components_m2/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components_m2/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { housekeepingData } from "@/lib/mock-data"
-import { Progress } from "@/components_m2/ui/progress"
+import { Progress } from "@/components/ui/progress"
 
 export default function HousekeepingPage() {
   const { tasks, maintenanceTickets, cleaningProgress } = housekeepingData

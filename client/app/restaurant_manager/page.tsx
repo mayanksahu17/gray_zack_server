@@ -22,6 +22,7 @@ export default function RestaurantPOS() {
   const [currentScreen, setCurrentScreen] = useState("dashboard")
   const [currentOrder, setCurrentOrder] = useState(null)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const user = AuthUtils.getUserData();
 
 
 
@@ -173,8 +174,8 @@ export default function RestaurantPOS() {
             </div>
             <Separator orientation="vertical" className="h-6" />
             <div className="flex items-center gap-2">
-              <span className="font-medium">John Doe</span>
-              <span className="text-muted-foreground text-sm">Cashier</span>
+              <span className="font-medium">{user?.name || 'Staff'}</span>
+              <span className="text-muted-foreground text-sm">{user?.role || 'Staff'}</span>
             </div>
           </div>
         </header>

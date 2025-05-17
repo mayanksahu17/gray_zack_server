@@ -6,6 +6,7 @@ const protectedRoutes = [
   '/front_desk',
   '/restaurant_manager',
   '/housekeeper',
+  '/housekeeper-dashboard',
   '/scheck'
 ];
 
@@ -35,6 +36,7 @@ export const config = {
     '/front_desk',
     '/restaurant_manager',
     '/housekeeper',
+    '/housekeeper-dashboard',
     '/scheck'
   ]
 }; 

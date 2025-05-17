@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [failedAttempts, setFailedAttempts] = useState(0)
   const [isLocked, setIsLocked] = useState(false)
   const router = useRouter()
+  const [userType, setUserType] = useState<'staff' | 'admin'>('staff')
 
 
   
@@ -50,7 +51,7 @@ if (AuthUtils.hasRole('restaurant_manager')) {
 }
 else if (AuthUtils.hasRole('housekeeper')) {
    // Do something specific to restaurant manager
-   router.push('/housekeeper')
+   router.push('/housekeeper-dashboard')
 }
 else if (AuthUtils.hasRole('front_desk')) {
    // Do something specific to restaurant manager
@@ -68,7 +69,7 @@ useEffect(() => {
         router.push('/manager_dashboard');
         break;
       case 'housekeeper':
-        router.push('/scheck');
+        router.push('/housekeeper-dashboard');
         break;
       case 'front_desk':
         router.push('/front_desk');
@@ -100,7 +101,10 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch('http://56.228.32.222:8000/api/v1/staff/hotel/login', {
+      const loginUrl = userType === 'admin'
+        ? 'http://56.228.32.222:8000/api/v1.0/admin/login'
+        : 'http://56.228.32.222:8000/api/v1/staff/hotel/login'
+      const response = await fetch(loginUrl, {
         method: 'POST',
         credentials: 'include', // Important for handling cookies
         headers: {
@@ -135,6 +139,20 @@ useEffect(() => {
           Cookies.remove('rememberMe')
         }
         
+        // Admin redirect
+        if (userType === 'admin') {
+          // Store admin accessToken for admin-protected endpoints
+          if (result.data && result.data.accessToken) {
+            Cookies.set('adminAccessToken', result.data.accessToken, {
+              expires: 1,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'strict'
+            });
+          }
+          router.push('/manager_dashboard')
+          return
+        }
+        
         // Role-based routing
         switch(result.data.role) {
           case 'restaurant_manager':
@@ -144,7 +162,7 @@ useEffect(() => {
             router.push('/manager_dashboard')
             break
           case 'housekeeper':
-            router.push('/scheck')
+            router.push('/housekeeper-dashboard')
             break
           case 'front_desk':
             router.push('/front_desk')
@@ -195,6 +213,31 @@ useEffect(() => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
+            {/* User type radio buttons */}
+            <div className="mb-4 flex justify-center gap-4">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="userType"
+                  value="staff"
+                  checked={userType === 'staff'}
+                  onChange={() => setUserType('staff')}
+                  className="accent-blue-600"
+                />
+                <span className="text-blue-800">Staff</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="radio"
+                  name="userType"
+                  value="admin"
+                  checked={userType === 'admin'}
+                  onChange={() => setUserType('admin')}
+                  className="accent-blue-600"
+                />
+                <span className="text-blue-800">Admin</span>
+              </label>
+            </div>
             <div className="space-y-2">
               <div className="relative">
                 <Label htmlFor="email" className="text-blue-800">
