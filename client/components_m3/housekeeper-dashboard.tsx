@@ -31,7 +31,7 @@ export function HousekeeperDashboard() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(`http://localhost:8000/api/v1/room`)
+        const res = await fetch(`http://56.228.32.222:8000/api/v1/room`)
         const data = await res.json()
         if (!res.ok) throw new Error(data.message || "Failed to fetch rooms")
         // Map API data to Room type expected by UI
@@ -57,7 +57,7 @@ export function HousekeeperDashboard() {
   // Update room status via API
   const updateRoomStatus = async (roomId: string, newStatus: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/room/${roomId}`, {
+      const res = await fetch(`http://56.228.32.222:8000/api/v1/room/${roomId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus.toLowerCase() }),

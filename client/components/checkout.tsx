@@ -101,7 +101,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const fetchTables = async () => {
     try {
       const response = await fetch(
-        "http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
+        "http://56.228.32.222:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables",
       )
       const data = await response.json()
       if (data.success) {
@@ -121,7 +121,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const fetchActiveBookings = async (hotelId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/room-service/active-bookings/60d21b4667d0d8992e610c85`,
+        `http://56.228.32.222:8000/api/v1/room-service/active-bookings/60d21b4667d0d8992e610c85`,
         {
           headers: {
             "Authorization": `Bearer ${localStorage.getItem('token')}`
@@ -152,7 +152,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const handleSelectTable = async (table: Table) => {
     try {
       // Update table status to occupied
-      const response = await fetch(`http://localhost:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables/${table.tableNumber}/status`, {
+      const response = await fetch(`http://56.228.32.222:8000/api/v1/admin/hotel/restaurant/67e8f522404a64803d0cea8d/tables/${table.tableNumber}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -200,7 +200,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
   const processOrder = async (orderDetails: OrderDetails) => {
     setIsProcessing(true)
     try {
-      const orderResponse = await fetch(`http://localhost:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
+      const orderResponse = await fetch(`http://56.228.32.222:8000/api/restaurants/67e8f522404a64803d0cea8d/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -244,7 +244,7 @@ export default function Checkout({ order, onComplete, onBack } : any) {
       
       // Create room service charge
       if (selectedBooking) {
-        const roomServiceResponse = await fetch("http://localhost:8000/api/v1/room-service/charge", {
+        const roomServiceResponse = await fetch("http://56.228.32.222:8000/api/v1/room-service/charge", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

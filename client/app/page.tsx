@@ -102,8 +102,8 @@ useEffect(() => {
 
     try {
       const loginUrl = userType === 'admin'
-        ? 'http://localhost:8000/api/v1.0/admin/login'
-        : 'http://localhost:8000/api/v1/staff/hotel/login'
+        ? 'http://56.228.32.222:8000/api/v1.0/admin/login'
+        : 'http://56.228.32.222:8000/api/v1/staff/hotel/login'
       const response = await fetch(loginUrl, {
         method: 'POST',
         credentials: 'include', // Important for handling cookies

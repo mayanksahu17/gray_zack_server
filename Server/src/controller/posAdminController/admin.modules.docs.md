@@ -1,10 +1,10 @@
 # Administrator API Testing Guide
 
-## Base URL: http://localhost:8000/api/v1.0/admin
+## Base URL: http://56.228.32.222:8000/api/v1.0/admin
 
 ### 1. Create First Administrator (System Admin) - No Authentication Required
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/initialize \
+curl -X POST http://56.228.32.222:8000/api/v1.0/admin/initialize \
 -H "Content-Type: application/json" \
 -d '{
   "name": "System Admin",
@@ -50,7 +50,7 @@ curl -X POST http://localhost:8000/api/v1.0/admin/initialize \
 
 ### 2. Login as System Admin
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/login \
+curl -X POST http://56.228.32.222:8000/api/v1.0/admin/login \
 -H "Content-Type: application/json" \
 -c cookies.txt \
 -d '{
@@ -73,7 +73,7 @@ curl -X POST http://localhost:8000/api/v1.0/admin/login \
 
 ### 3. Create Hotel Admin (Requires System Admin Authentication)
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/create \
+curl -X POST http://56.228.32.222:8000/api/v1.0/admin/create \
 -H "Content-Type: application/json" \
 -b cookies.txt \
 -d '{
@@ -112,7 +112,7 @@ curl -X POST http://localhost:8000/api/v1.0/admin/create \
 
 ### 4. Verify Created Hotel Admin (List Administrators)
 ```bash
-curl -X POST "http://localhost:8000/api/v1.0/admin?page=1&limit=10" \
+curl -X POST "http://56.228.32.222:8000/api/v1.0/admin?page=1&limit=10" \
 -H "Content-Type: application/json" \
 -b cookies.txt
 
@@ -145,7 +145,7 @@ curl -X POST "http://localhost:8000/api/v1.0/admin?page=1&limit=10" \
 
 ### 5. Logout
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/logout \
+curl -X POST http://56.228.32.222:8000/api/v1.0/admin/logout \
 -b cookies.txt
 
 # Expected Success Response (200):
@@ -159,7 +159,7 @@ curl -X POST http://localhost:8000/api/v1.0/admin/logout \
 
 1. Creating Admin with Existing Email:
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/create \
+curl -X POST http://56.228.32.222:8000/api/v1.0/admin/create \
 -H "Content-Type: application/json" \
 -b cookies.txt \
 -d '{
@@ -179,7 +179,7 @@ curl -X POST http://localhost:8000/api/v1.0/admin/create \
 
 2. Invalid Password Format:
 ```bash
-curl -X POST http://localhost:8000/api/v1.0/admin/create \
+curl -X POST http://56.228.32.222:8000/api/v1.0/admin/create \
 -H "Content-Type: application/json" \
 -b cookies.txt \
 -d '{
@@ -198,7 +198,7 @@ curl -X POST http://localhost:8000/api/v1.0/admin/create \
 ```
 
 ## Testing Notes:
-1. Replace `http://localhost:8000` with your actual API base URL
+1. Replace `http://56.228.32.222:8000` with your actual API base URL
 2. The `-c cookies.txt` flag saves cookies from the response
 3. The `-b cookies.txt` flag sends cookies with the request
 4. Ensure proper phone number format: `+{country-code}-{xxx}-{xxx}-{xxxx}`

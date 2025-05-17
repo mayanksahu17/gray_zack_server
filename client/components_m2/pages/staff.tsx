@@ -76,7 +76,7 @@ export default function StaffPage() {
     try {
       const token = typeof window !== 'undefined' ? require('js-cookie').get('adminAccessToken') : '';
       const res = await axios.post(
-        `http://localhost:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`,
+        `http://56.228.32.222:8000/api/v1/admin/hotels/67dd8f8173deaf59ece8e7f3/roles`,
         {
           ...form,
           permissions: selectedPermissions,
