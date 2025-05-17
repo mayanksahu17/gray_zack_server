@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Administrator, AdminRole, AdminStatus, AdminPermission } from '../../models/administrator.model';
+import { Administrator, AdminRole, AdminStatus, AdminPermission, IAdministrator } from '../../models/administrator.model';
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../../utills/ApiError';
 import { asyncHandler } from '../../utills/asyncHandler';
@@ -94,7 +94,7 @@ export const loginAdministrator = asyncHandler(async (req: Request, res: Respons
     throw new ApiError(400, "Email and password are required");
   }
 
-  const administrator = await Administrator.findByEmail(email);
+  const administrator = await Administrator.findByEmail(email) as IAdministrator;
   if (!administrator) {
     throw new ApiError(401, "Invalid credentials");
   }
@@ -109,7 +109,7 @@ export const loginAdministrator = asyncHandler(async (req: Request, res: Respons
   }
 
   // Generate tokens
-  const { accessToken, refreshToken } = await generateAccessTokenandRefreshToken(administrator._id);
+  const { accessToken, refreshToken } = await generateAccessTokenandRefreshToken((administrator._id as Types.ObjectId).toString());
 
   // Set cookies
   res.cookie('accessToken', accessToken, {
@@ -233,7 +233,7 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
       process.env.REFRESH_TOKEN_SECRET || 'fallback-refresh-secret'
     ) as { id: string };
 
-    const administrator = await Administrator.findById(decodedToken.id);
+    const administrator = await Administrator.findById(decodedToken.id) as IAdministrator;
     if (!administrator) {
       throw new ApiError(401, "Invalid refresh token");
     }
@@ -242,7 +242,7 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
       throw new ApiError(401, "Refresh token is expired or used");
     }
 
-    const { accessToken, refreshToken } = await generateAccessTokenandRefreshToken(administrator._id);
+    const { accessToken, refreshToken } = await generateAccessTokenandRefreshToken((administrator._id as Types.ObjectId).toString());
 
     // Set new cookies
     res.cookie('accessToken', accessToken, {

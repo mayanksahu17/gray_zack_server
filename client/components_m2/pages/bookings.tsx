@@ -1,19 +1,63 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Calendar, Filter, Search } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components_m2/ui/card"
-import { Input } from "@/components_m2/ui/input"
-import { Button } from "@/components_m2/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components_m2/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components_m2/ui/select"
-import { Badge } from "@/components_m2/ui/badge"
-import { bookingsData } from "@/lib/mock-data"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import axios from "axios"
+
+interface Booking {
+  id: string
+  guest: string
+  room: string
+  checkIn: string
+  checkOut: string
+  status: string
+  source: string
+  payment: string
+  amount: string
+}
+
+interface BookingsData {
+  bookings: Booking[]
+  upcomingCheckIns: number
+  upcomingCheckOuts: number
+  cancellations: number
+  noShows: number
+}
 
 export default function BookingsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [sourceFilter, setSourceFilter] = useState("all")
+  const [bookingsData, setBookingsData] = useState<BookingsData>({
+    bookings: [],
+    upcomingCheckIns: 0,
+    upcomingCheckOuts: 0,
+    cancellations: 0,
+    noShows: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/api/v1/booking')
+        setBookingsData(response.data)
+        setLoading(false)
+      } catch (err) {
+        setError('Failed to fetch bookings data')
+        setLoading(false)
+      }
+    }
+
+    fetchBookings()
+  }, [])
 
   const { bookings, upcomingCheckIns, upcomingCheckOuts, cancellations, noShows } = bookingsData
 
@@ -31,12 +75,16 @@ export default function BookingsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Confirmed":
-        return <Badge className="bg-blue-500 hover:bg-blue-600">{status}</Badge>
-      case "Checked In":
-        return <Badge className="bg-green-500 hover:bg-green-600">{status}</Badge>
-      case "Checked Out":
-        return <Badge className="bg-gray-500 hover:bg-gray-600">{status}</Badge>
+      case "booked":
+        return <Badge className="bg-blue-500 hover:bg-blue-600">Confirmed</Badge>
+      case "checked_in":
+        return <Badge className="bg-green-500 hover:bg-green-600">Checked In</Badge>
+      case "checked_out":
+        return <Badge className="bg-gray-500 hover:bg-gray-600">Checked Out</Badge>
+      case "cancelled":
+        return <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
+      case "no_show":
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600">No Show</Badge>
       default:
         return <Badge>{status}</Badge>
     }
@@ -44,15 +92,23 @@ export default function BookingsPage() {
 
   const getPaymentBadge = (status: string) => {
     switch (status) {
-      case "Paid":
-        return <Badge className="bg-green-500 hover:bg-green-600">{status}</Badge>
-      case "Partial":
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">{status}</Badge>
-      case "Pending":
-        return <Badge className="bg-red-500 hover:bg-red-600">{status}</Badge>
+      case "paid":
+        return <Badge className="bg-green-500 hover:bg-green-600">Paid</Badge>
+      case "partial":
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600">Partial</Badge>
+      case "pending":
+        return <Badge className="bg-red-500 hover:bg-red-600">Pending</Badge>
       default:
         return <Badge>{status}</Badge>
     }
+  }
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>
   }
 
   return (
@@ -123,9 +179,11 @@ export default function BookingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="Confirmed">Confirmed</SelectItem>
-                    <SelectItem value="Checked In">Checked In</SelectItem>
-                    <SelectItem value="Checked Out">Checked Out</SelectItem>
+                    <SelectItem value="booked">Confirmed</SelectItem>
+                    <SelectItem value="checked_in">Checked In</SelectItem>
+                    <SelectItem value="checked_out">Checked Out</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="no_show">No Show</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
