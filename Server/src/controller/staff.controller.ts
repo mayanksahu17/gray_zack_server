@@ -52,7 +52,7 @@ export const loginStaff = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(401, "Invalid credentials");
   }
 
-  const { accessToken, refreshToken } = await generateTokens(staff._id);
+  const { accessToken, refreshToken } = await generateTokens((staff._id as mongoose.Types.ObjectId).toString());
 
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
@@ -192,7 +192,7 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
       throw new ApiError(401, "Invalid refresh token");
     }
 
-    const { accessToken, refreshToken } = await generateTokens(staff._id);
+    const { accessToken, refreshToken } = await generateTokens((staff._id as mongoose.Types.ObjectId).toString());
 
     res.cookie('accessToken', accessToken, {
       httpOnly: true,

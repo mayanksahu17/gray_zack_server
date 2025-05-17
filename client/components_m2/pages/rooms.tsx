@@ -1,18 +1,60 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AlertCircle, Search } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components_m2/ui/card"
-import { Input } from "@/components_m2/ui/input"
-import { Button } from "@/components_m2/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components_m2/ui/table"
-import { Badge } from "@/components_m2/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components_m2/ui/tabs"
-import { roomsData } from "@/lib/mock-data"
-import { Alert, AlertDescription, AlertTitle } from "@/components_m2/ui/alert"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import axios from "axios"
+
+interface Room {
+  room: string
+  type: string
+  status: string
+  guest: string | null
+  checkOut: string | null
+}
+
+interface InventoryItem {
+  item: string
+  stock: number
+  reorderLevel: number
+  status: string
+}
+
+interface RoomsData {
+  roomStatus: Room[]
+  inventory: InventoryItem[]
+}
 
 export default function RoomsPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [roomsData, setRoomsData] = useState<RoomsData>({
+    roomStatus: [],
+    inventory: []
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/api/v1/room/status')
+        setRoomsData(response.data)
+        setLoading(false)
+      } catch (err) {
+        setError('Failed to fetch rooms data')
+        setLoading(false)
+      }
+    }
+
+    fetchRooms()
+  }, [])
+
   const { roomStatus, inventory } = roomsData
 
   const filteredRooms = roomStatus.filter((room) => {
@@ -30,14 +72,16 @@ export default function RoomsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Occupied":
-        return <Badge className="bg-blue-500 hover:bg-blue-600">{status}</Badge>
-      case "Clean":
-        return <Badge className="bg-green-500 hover:bg-green-600">{status}</Badge>
-      case "Dirty":
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">{status}</Badge>
-      case "Maintenance":
-        return <Badge className="bg-red-500 hover:bg-red-600">{status}</Badge>
+      case "available":
+        return <Badge className="bg-green-500 hover:bg-green-600">Available</Badge>
+      case "occupied":
+        return <Badge className="bg-blue-500 hover:bg-blue-600">Occupied</Badge>
+      case "maintenance":
+        return <Badge className="bg-red-500 hover:bg-red-600">Maintenance</Badge>
+      case "cleaning":
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600">Cleaning</Badge>
+      case "out of order":
+        return <Badge className="bg-gray-500 hover:bg-gray-600">Out of Order</Badge>
       default:
         return <Badge>{status}</Badge>
     }
@@ -57,6 +101,14 @@ export default function RoomsPage() {
   }
 
   const lowInventoryItems = inventory.filter((item) => item.status !== "Adequate")
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>
+  }
 
   return (
     <div className="space-y-6">
@@ -103,11 +155,11 @@ export default function RoomsPage() {
                   <Card key={room.room} className="overflow-hidden">
                     <div
                       className={`h-2 w-full ${
-                        room.status === "Occupied"
+                        room.status === "occupied"
                           ? "bg-blue-500"
-                          : room.status === "Clean"
+                          : room.status === "available"
                             ? "bg-green-500"
-                            : room.status === "Dirty"
+                            : room.status === "cleaning"
                               ? "bg-yellow-500"
                               : "bg-red-500"
                       }`}
