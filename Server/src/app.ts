@@ -8,6 +8,7 @@ const whitelist = [
   // 'http://localhost:3001',
   // 'http://localhost:3002',
   'http://13.53.43.124:3000',
+  'http://56.228.32.222:3000',
   // 'https://gray-zack-113j.vercel.app',
   // 'https://gray-zack.vercel.app',
   // 'http://localhost:3000',
